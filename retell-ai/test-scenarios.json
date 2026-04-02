@@ -2,104 +2,136 @@
   "test_scenarios": [
     {
       "id": 1,
-      "name": "Terminwunsch mit Verordnung – Neupatient",
-      "category": "lead_qualification",
+      "name": "Neupatientin mit Verordnung – Termin gebucht, SMS erhalten",
+      "category": "full_booking",
       "caller_messages": [
         "Hallo, ich würde gerne einen Termin machen.",
+        "Nein, das wäre mein erster Besuch.",
         "Ich habe eine Verordnung vom Arzt.",
-        "Ich habe Rückenschmerzen, unterer Rücken.",
-        "Nein, das wäre mein erster Besuch bei Ihnen.",
-        "Mein Name ist Maria Schmidt.",
-        "Sie erreichen mich unter 0170 123 4567."
+        "Dienstag um 10 Uhr wäre super.",
+        "Maria Schmidt.",
+        "Ja, die Nummer stimmt."
       ],
       "expected_agent_behavior": [
-        "Begrüßung mit 'Physiotherapie im Sprengelkiez, hier ist Jana'",
-        "Fragt nach Verordnung/Selbstzahler",
-        "Fragt nach Beschwerden",
+        "Begrüßung: 'Physiotherapie im Sprengelkiez, hier ist Jana'",
         "Fragt ob Neu-/Bestandspatient",
-        "Fragt nach vollständigem Namen",
-        "Fragt nach Telefonnummer",
-        "Ruft save_lead auf",
-        "Kündigt Transfer an",
-        "Ruft transfer_call auf"
+        "Fragt nach Verordnung/Selbstzahler",
+        "Ruft get_available_slots auf (duration_minutes: 20, days_ahead: 5)",
+        "Nennt 3 konkrete Zeitoptionen",
+        "Fragt nach Name",
+        "Fragt ob Anrufnummer korrekt ist",
+        "Ruft book_appointment auf",
+        "Bestätigt Termin mündlich",
+        "Ruft send_sms_confirmation auf",
+        "Verabschiedung"
       ],
-      "expected_lead_data": {
-        "name": "Maria Schmidt",
-        "phone": "0170 123 4567",
-        "reason": "Rückenschmerzen, unterer Rücken",
-        "prescription": "Verordnung",
-        "new_patient": true
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"],
+      "expected_booking_data": {
+        "patient_name": "Maria Schmidt",
+        "patient_type": "new_patient",
+        "prescription": true
       }
     },
     {
       "id": 2,
-      "name": "Terminwunsch als Selbstzahler – Bestandspatient",
-      "category": "lead_qualification",
+      "name": "Bestandspatient, Selbstzahler, Massage – Termin gebucht",
+      "category": "full_booking",
       "caller_messages": [
         "Ich möchte gerne eine Massage buchen.",
+        "Ja, ich bin schon bei euch Patient.",
         "Als Selbstzahler.",
-        "Verspannungen im Schulter-Nacken-Bereich.",
-        "Ja, ich bin schon Patient bei euch.",
+        "Donnerstag nachmittag wäre gut.",
         "Thomas Müller.",
-        "030 9876 5432."
+        "Ne, bitte unter 0170 9876543."
       ],
       "expected_agent_behavior": [
         "Erkennt Terminwunsch",
-        "Qualifizierung durchlaufen",
-        "save_lead mit new_patient=false",
-        "Transfer"
+        "Fragt ob Neu-/Bestandspatient",
+        "Fragt nach Verordnung/Selbstzahler",
+        "Ruft get_available_slots auf (duration_minutes: 20)",
+        "Nennt Optionen für Donnerstag nachmittag",
+        "Fragt nach Name",
+        "Fragt ob Anrufnummer korrekt → Patient gibt andere Nummer",
+        "Wiederholt neue Nummer zur Bestätigung",
+        "Ruft book_appointment auf mit neuer Nummer",
+        "Ruft send_sms_confirmation auf",
+        "Verabschiedung"
       ],
-      "expected_lead_data": {
-        "name": "Thomas Müller",
-        "phone": "030 9876 5432",
-        "reason": "Verspannungen im Schulter-Nacken-Bereich",
-        "prescription": "Selbstzahler",
-        "new_patient": false
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"],
+      "expected_booking_data": {
+        "patient_name": "Thomas Müller",
+        "patient_phone": "+49170 9876543",
+        "patient_type": "existing_patient",
+        "prescription": false
       }
     },
     {
       "id": 3,
-      "name": "Preisfrage Massage",
-      "category": "faq",
+      "name": "Patient fragt nach Preisen, dann Termin",
+      "category": "faq_then_booking",
       "caller_messages": [
-        "Was kostet bei euch eine Massage?"
+        "Was kostet bei euch eine Massage?",
+        "Okay, dann würde ich gerne einen Termin für eine Massage machen.",
+        "Neupatient, Selbstzahler.",
+        "Mittwoch Vormittag.",
+        "Sabine Weber.",
+        "Ja, die Nummer passt."
       ],
       "expected_agent_behavior": [
-        "Nennt Preise: 30€/20Min, 40€/30Min mit Heißluft, 45€/40Min mit Fango",
-        "Fragt ob noch weitere Fragen"
+        "Beantwortet Preisfrage: 30€/20Min, 40€/30Min, 45€/40Min",
+        "Fragt ob noch etwas gewünscht",
+        "Erkennt Terminwunsch",
+        "Einordnung (verkürzt, da Patient schon Infos gab)",
+        "get_available_slots → 3 Optionen",
+        "book_appointment",
+        "send_sms_confirmation"
       ],
-      "expected_tools_called": []
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"]
     },
     {
       "id": 4,
-      "name": "Frage nach Öffnungszeiten",
-      "category": "faq",
+      "name": "Gewünschter Slot belegt – Alternative angeboten",
+      "category": "slot_negotiation",
       "caller_messages": [
-        "Wann habt ihr geöffnet?"
+        "Ich brauche einen Termin für Krankengymnastik.",
+        "Neupatient mit Verordnung.",
+        "Geht Montag um 9?",
+        "Hmm, dann Montag um 10.",
+        "Lisa Braun.",
+        "Ja, Nummer stimmt."
       ],
       "expected_agent_behavior": [
-        "Nennt Öffnungszeiten: Mo-Fr 09:00-18:00",
-        "Erwähnt Rezeptionszeiten: Mo-Fr 09:00-12:00",
-        "Fragt ob noch weitere Fragen"
+        "get_available_slots aufgerufen",
+        "Montag 9 Uhr nicht in Slots → Agent bietet Alternativen",
+        "Patient wählt Montag 10 Uhr",
+        "book_appointment mit gewähltem Slot",
+        "send_sms_confirmation"
       ],
-      "expected_tools_called": []
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"]
     },
     {
       "id": 5,
-      "name": "Frage nach Adresse und Anfahrt",
-      "category": "faq",
+      "name": "Patient gibt andere Rückrufnummer an",
+      "category": "phone_override",
       "caller_messages": [
-        "Wo genau seid ihr? Wie komme ich am besten dahin?"
+        "Termin bitte, Bestandspatient, Verordnung.",
+        "Dienstag 14 Uhr.",
+        "Hans Meier.",
+        "Nein, bitte unter 030 1234567.",
+        "Ja, 030 1234567, genau."
       ],
       "expected_agent_behavior": [
-        "Nennt Adresse: Sprengelstraße 47, 13353 Berlin",
-        "Nennt ÖPNV: U6/U9 Leopoldplatz, S41/S42 Wedding, Bus 142"
+        "Fragt ob Anrufnummer korrekt",
+        "Patient sagt nein → fragt nach anderer Nummer",
+        "Wiederholt Nummer zur Bestätigung",
+        "book_appointment mit neuer Nummer",
+        "send_sms_confirmation an neue Nummer"
       ],
-      "expected_tools_called": []
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"]
     },
     {
       "id": 6,
-      "name": "Medizinische Frage – sofortiger Transfer",
+      "name": "Patient fragt nach Diagnose – sofort Transfer",
       "category": "transfer",
       "caller_messages": [
         "Ich habe einen Bandscheibenvorfall an L4/L5. Welche Therapie empfehlen Sie mir?"
@@ -107,36 +139,66 @@
       "expected_agent_behavior": [
         "Stellt KEINE Diagnose",
         "Empfiehlt KEINE spezifische Therapie",
-        "Kündigt Transfer an",
+        "Sagt: 'Das beantwortet Ihnen unser Team gerne – ich verbinde Sie kurz.'",
         "Ruft transfer_call auf"
       ],
       "expected_tools_called": ["transfer_call"]
     },
     {
       "id": 7,
-      "name": "Unklare Aussage – Nachfrage",
-      "category": "unclear",
-      "caller_messages": [
-        "Äh... ja... also ich weiß nicht genau..."
-      ],
-      "expected_agent_behavior": [
-        "Fragt freundlich nach: 'Möchten Sie einen Termin vereinbaren, oder haben Sie eine Frage?'"
-      ],
-      "expected_tools_called": []
-    },
-    {
-      "id": 8,
-      "name": "Patient will sofort Menschen sprechen",
+      "name": "Patient möchte bestimmten Therapeuten – Transfer",
       "category": "transfer",
       "caller_messages": [
-        "Kann ich bitte direkt mit jemandem aus der Praxis sprechen?"
+        "Ich möchte einen Termin bei Herrn Schneider."
       ],
       "expected_agent_behavior": [
-        "Leitet sofort weiter ohne Qualifizierung",
-        "Kündigt Transfer an",
+        "Weist KEINEN Therapeuten zu",
+        "Sagt: 'Ich verbinde Sie kurz mit unserem Team.'",
         "Ruft transfer_call auf"
       ],
       "expected_tools_called": ["transfer_call"]
+    },
+    {
+      "id": 8,
+      "name": "Kein Slot in 5 Tagen – Transfer angeboten",
+      "category": "no_slots",
+      "caller_messages": [
+        "Termin bitte.",
+        "Neupatient, Verordnung."
+      ],
+      "simulated_tool_response": {
+        "get_available_slots": { "slots": [] }
+      },
+      "expected_agent_behavior": [
+        "get_available_slots gibt leere Liste zurück",
+        "Agent erklärt: keine Slots in nächsten 5 Tagen",
+        "Bietet Transfer an",
+        "Ruft transfer_call auf"
+      ],
+      "expected_tools_called": ["get_available_slots", "transfer_call"]
+    },
+    {
+      "id": 9,
+      "name": "SMS-Bestätigung korrekt",
+      "category": "sms_verification",
+      "verification": [
+        "SMS enthält Patientenname",
+        "SMS enthält korrektes Datum und Uhrzeit",
+        "SMS enthält Praxisadresse",
+        "SMS enthält Telefonnummer der Praxis"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Termin erscheint in Google Calendar",
+      "category": "calendar_verification",
+      "verification": [
+        "Calendar Event existiert mit korrektem Datum/Zeit",
+        "Titel: '[Name] – Physiotherapie'",
+        "Beschreibung enthält: Verordnung ja/nein, Neu-/Bestandspatient, Notizen",
+        "Dauer: 20 Minuten",
+        "Erinnerung: 24h vorher"
+      ]
     }
   ]
 }

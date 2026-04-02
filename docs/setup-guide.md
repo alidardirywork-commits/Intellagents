@@ -1,206 +1,318 @@
-# Setup-Anleitung: Jana – Voice Agent für Physiotherapie im Sprengelkiez
+# Setup-Anleitung: Jana – KI-Rezeptionistin für Physiotherapie im Sprengelkiez
 
 ## Übersicht
 
-Dieses Projekt implementiert einen KI-gestützten Telefonassistenten ("Jana") für die Physiotherapie im Sprengelkiez. Der Agent nimmt eingehende Anrufe entgegen, beantwortet häufige Fragen, qualifiziert Terminanfragen und leitet bei Bedarf an echte Mitarbeiter weiter.
+KI-Rezeptionistin, die Anrufe entgegennimmt und Termine direkt bucht – ohne Rückruf, ohne Wartezeit.
+
+**Ablauf:** Patient ruft an → Jana bucht Termin → SMS-Bestätigung → fertig. Unter 3 Minuten.
 
 ### Architektur
 
 ```
-Anruf → Retell AI (Voice) → Claude Sonnet (LLM) → Tools:
-                                                     ├── save_lead → n8n Webhook → Supabase
-                                                     └── transfer_call → Praxis-Telefon
+Anruf → Retell AI (Voice + ElevenLabs) → Claude Sonnet (LLM)
+                                            ├── get_available_slots → n8n → Google Calendar API
+                                            ├── book_appointment   → n8n → Google Calendar + Twilio SMS + Supabase + E-Mail
+                                            ├── send_sms_confirmation → n8n → Twilio
+                                            └── transfer_call      → Praxis-Telefon (030 453 64 46)
+```
+
+### Dateistruktur
+
+```
+retell-ai/
+  system-prompt.md       ← System Prompt für Jana
+  agent-config.json      ← Retell AI Agent-Konfiguration
+  test-scenarios.json    ← 10 Testszenarien
+n8n/
+  workflow-slots.json    ← Workflow A: Freie Slots abrufen
+  workflow-booking.json  ← Workflow B: Buchen + SMS + Calendar + Log
+supabase/
+  schema.sql             ← Datenbank-Schema (Appointments Log)
+docs/
+  setup-guide.md         ← Diese Datei
 ```
 
 ---
 
-## 1. Supabase einrichten
+## 1. Google Calendar API einrichten
 
-### 1.1 Projekt erstellen
+### 1.1 Google Cloud Projekt
 
-1. Gehe zu [supabase.com](https://supabase.com) und erstelle ein neues Projekt
-2. Wähle die Region `eu-central-1` (Frankfurt) für niedrige Latenz
+1. Gehe zu [console.cloud.google.com](https://console.cloud.google.com)
+2. Erstelle ein neues Projekt: **Physio Sprengelkiez**
+3. Aktiviere die **Google Calendar API** unter APIs & Services → Library
 
-### 1.2 Tabelle anlegen
+### 1.2 OAuth 2.0 Credentials
 
-1. Öffne den **SQL Editor** in Supabase
-2. Kopiere den Inhalt von `supabase/schema.sql` und führe ihn aus
-3. Überprüfe unter **Table Editor**, dass die Tabelle `leads` erstellt wurde
+1. Gehe zu **APIs & Services → Credentials**
+2. Erstelle **OAuth 2.0 Client ID** (Typ: Web Application)
+3. Redirect URI hinzufügen: `https://DEINE-N8N-URL/rest/oauth2-credential/callback`
+4. Notiere **Client ID** und **Client Secret**
 
-### 1.3 API-Schlüssel notieren
+### 1.3 Praxis-Kalender
 
-Unter **Settings → API** findest du:
-- **Project URL** → z.B. `https://xxxxx.supabase.co`
-- **service_role Key** → wird für n8n benötigt (nicht den anon Key!)
+1. Erstelle einen Google Calendar für die Praxis (oder nutze einen bestehenden)
+2. Notiere die **Calendar ID** (unter Kalender-Einstellungen → Kalender integrieren)
+   - Format: `xxxxxxx@group.calendar.google.com` oder E-Mail-Adresse
 
 ---
 
-## 2. n8n einrichten
+## 2. Twilio Account einrichten
 
-### 2.1 Workflow importieren
+### 2.1 Account erstellen
 
-1. Öffne deine n8n-Instanz
-2. Gehe zu **Workflows → Import from File**
-3. Importiere `n8n/workflow.json`
+1. Registriere bei [twilio.com](https://www.twilio.com)
+2. Notiere **Account SID** und **Auth Token** (Dashboard)
 
-### 2.2 Credentials konfigurieren
+### 2.2 Telefonnummer kaufen
 
-#### Supabase-Credential:
-1. Gehe zu **Credentials → New Credential → Supabase**
-2. Trage ein:
-   - **Host:** Deine Supabase Project URL
-   - **Service Role Key:** Der service_role Key aus Schritt 1.3
+1. Gehe zu **Phone Numbers → Buy a Number**
+2. Kaufe eine deutsche Nummer (+49) mit SMS-Fähigkeit
+3. Notiere die Nummer (Format: `+49...`)
 
-#### SMTP-Credential (für E-Mail-Benachrichtigung):
-1. Gehe zu **Credentials → New Credential → SMTP**
-2. Trage die SMTP-Daten des Praxis-E-Mail-Kontos ein
-3. Alternativ: Lösche den E-Mail-Node und verbinde "Supabase – Lead speichern" direkt mit "Response – Erfolg"
-
-### 2.3 Workflow aktivieren
-
-1. Öffne den importierten Workflow
-2. Aktualisiere die Credential-Referenzen in den Nodes
-3. Klicke auf **Active** (Toggle oben rechts)
-4. Notiere die **Webhook-URL** → z.B. `https://deine-n8n-instanz.com/webhook/retell-lead`
-
-### 2.4 Webhook testen
+### 2.3 SMS testen
 
 ```bash
-curl -X POST https://DEINE-N8N-URL/webhook/retell-lead \
+curl -X POST "https://api.twilio.com/2010-04-01/Accounts/ACCOUNT_SID/Messages.json" \
+  -u "ACCOUNT_SID:AUTH_TOKEN" \
+  -d "From=+49TWILIO_NUMMER" \
+  -d "To=+49DEINE_NUMMER" \
+  -d "Body=Testmeldung von Jana"
+```
+
+---
+
+## 3. Supabase einrichten
+
+### 3.1 Projekt erstellen
+
+1. Gehe zu [supabase.com](https://supabase.com)
+2. Neues Projekt erstellen, Region: **eu-central-1** (Frankfurt)
+
+### 3.2 Schema anlegen
+
+1. Öffne **SQL Editor**
+2. Kopiere den Inhalt von `supabase/schema.sql` und führe aus
+3. Prüfe unter **Table Editor**: Tabelle `appointments` existiert
+
+### 3.3 API-Schlüssel notieren
+
+Unter **Settings → API**:
+- **Project URL** → `https://xxxxx.supabase.co`
+- **service_role Key** → wird für n8n benötigt (NICHT den anon Key)
+
+---
+
+## 4. n8n Credentials konfigurieren
+
+### 4.1 Google Calendar Credential
+
+1. **Credentials → New → Google Calendar (OAuth2)**
+2. Trage Client ID und Client Secret ein
+3. Klicke **Connect** und autorisiere den Zugriff
+
+### 4.2 Twilio Credential
+
+1. **Credentials → New → Twilio**
+2. Trage ein:
+   - Account SID
+   - Auth Token
+
+### 4.3 Supabase Credential
+
+1. **Credentials → New → Supabase**
+2. Trage ein:
+   - Host: Deine Supabase Project URL
+   - Service Role Key
+
+### 4.4 SMTP Credential (für E-Mail-Benachrichtigung)
+
+1. **Credentials → New → SMTP**
+2. Trage SMTP-Daten des Praxis-E-Mail-Kontos ein
+3. *Optional:* Kann auch weggelassen werden – E-Mail-Node dann aus Workflow entfernen
+
+---
+
+## 5. n8n Workflows importieren & aktivieren
+
+### 5.1 Workflow A – Freie Slots
+
+1. **Workflows → Import from File** → `n8n/workflow-slots.json`
+2. Öffne den Workflow und ersetze Platzhalter:
+   - `{{GOOGLE_CALENDAR_ID}}` → Deine Calendar ID
+   - Google Calendar Credential zuweisen
+3. Klicke **Active** (Toggle oben rechts)
+4. Notiere die **Webhook-URL**: `https://DEINE-N8N-URL/webhook/retell-slots`
+
+### 5.2 Workflow B – Termin buchen
+
+1. **Workflows → Import from File** → `n8n/workflow-booking.json`
+2. Öffne den Workflow und ersetze Platzhalter:
+   - `{{GOOGLE_CALENDAR_ID}}` → Deine Calendar ID
+   - `{{TWILIO_PHONE_NUMBER}}` → Deine Twilio-Nummer (+49...)
+   - Alle Credentials zuweisen (Google Calendar, Twilio, Supabase, SMTP)
+3. Klicke **Active**
+4. Notiere die **Webhook-URL**: `https://DEINE-N8N-URL/webhook/retell-book`
+
+### 5.3 Workflows testen
+
+**Slots testen:**
+```bash
+curl -X POST https://DEINE-N8N-URL/webhook/retell-slots \
+  -H "Content-Type: application/json" \
+  -d '{"duration_minutes": 20, "days_ahead": 5}'
+```
+
+Erwartete Antwort: `{ "slots": [{ "date": "Montag, 7. April", "time": "09:00", "slot_id": "2026-04-07_0900" }, ...] }`
+
+**Buchung testen:**
+```bash
+curl -X POST https://DEINE-N8N-URL/webhook/retell-book \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Max Mustermann",
-    "phone": "+491701234567",
-    "reason": "Rückenschmerzen",
-    "prescription": "Verordnung",
-    "new_patient": true
+    "slot_id": "2026-04-07_0900",
+    "patient_name": "Max Mustermann",
+    "patient_phone": "+491701234567",
+    "patient_type": "new_patient",
+    "prescription": true,
+    "notes": "Testbuchung"
   }'
 ```
 
-Erwartete Antwort: `{ "success": true, "message": "Lead gespeichert", "lead_id": "..." }`
+Erwartete Antwort: `{ "success": true, "calendar_event_id": "...", "sms_sent": true }`
+
+Prüfe danach:
+- [ ] Termin in Google Calendar sichtbar
+- [ ] SMS auf dem Testhandy empfangen
+- [ ] Eintrag in Supabase `appointments` Tabelle
+- [ ] E-Mail an info@physio-sprengelkiez.de
 
 ---
 
-## 3. Retell AI einrichten
+## 6. Retell AI Agent einrichten
 
-### 3.1 Agent erstellen
+### 6.1 Agent erstellen
 
-1. Gehe zu [retellai.com](https://retellai.com) und logge dich ein
-2. Erstelle einen neuen **Agent**
+1. Gehe zu [retellai.com](https://retellai.com) → Dashboard → **New Agent**
+2. Name: **Jana – Physio Sprengelkiez**
 
-### 3.2 LLM konfigurieren
+### 6.2 LLM konfigurieren
 
-1. Wähle **Custom LLM** → **Claude** als Provider
+1. Wähle **Custom LLM → Claude** als Provider
 2. Modell: `claude-sonnet-4-20250514`
 3. Kopiere den gesamten Inhalt von `retell-ai/system-prompt.md` als System Prompt
+4. Temperature: `0.4`
 
-### 3.3 Voice konfigurieren
+### 6.3 Voice konfigurieren
 
-1. Wähle **ElevenLabs** als Voice Provider
-2. Wähle eine natürlich klingende deutsche Stimme (z.B. "Anna")
+1. Voice Provider: **ElevenLabs**
+2. Wähle eine natürlich klingende deutsche Stimme
 3. Sprache: `de-DE`
-4. Stability: `0.6`
-5. Similarity Boost: `0.8`
+4. Stability: `0.75`
+5. Similarity Boost: `0.85`
+6. Style: `0.3`
+7. Notiere die **Voice ID** und trage sie in `agent-config.json` ein
 
-### 3.4 Conversation Settings
+### 6.4 Conversation Settings
 
 | Einstellung | Wert |
 |---|---|
 | Responsiveness | 1.0 |
-| Interruption Sensitivity | 0.5 (Medium) |
-| Backchannel | Aktiviert |
-| Max Call Duration | 600 Sekunden |
-| Begin Message | Deaktiviert (Agent beginnt mit Begrüßung aus System Prompt) |
+| Interruption Sensitivity | Medium (0.5) |
+| Backchannel | Aktiviert: mhm, ja, verstehe, natürlich |
+| Max Call Duration | 480 Sekunden (8 Min) |
+| Begin Message | Deaktiviert |
 | End Call After Silence | 30 Sekunden |
 
-### 3.5 Tools konfigurieren
+### 6.5 Tools konfigurieren
 
-#### Tool 1: `save_lead`
+#### Tool 1: `get_available_slots`
+- Typ: **Webhook**
+- URL: `https://DEINE-N8N-URL/webhook/retell-slots`
+- Method: POST
+- Parameter: siehe `agent-config.json`
 
-1. Erstelle ein neues **Custom Tool** vom Typ **Webhook**
-2. Name: `save_lead`
-3. Beschreibung: `Speichert die Lead-Daten eines Patienten, der einen Termin vereinbaren möchte. Rufe dieses Tool auf, nachdem du alle Qualifizierungsfragen gestellt und beantwortet bekommen hast.`
-4. URL: Deine n8n Webhook-URL aus Schritt 2.3
-5. Method: `POST`
-6. Header: `Content-Type: application/json`
-7. Parameter (siehe `retell-ai/agent-config.json` für das vollständige Schema):
-   - `name` (string, required)
-   - `phone` (string, required)
-   - `reason` (string, required)
-   - `prescription` (string, enum: Verordnung/Selbstzahler, required)
-   - `new_patient` (boolean, required)
+#### Tool 2: `book_appointment`
+- Typ: **Webhook**
+- URL: `https://DEINE-N8N-URL/webhook/retell-book`
+- Method: POST
+- Parameter: siehe `agent-config.json`
 
-#### Tool 2: `transfer_call`
+#### Tool 3: `send_sms_confirmation`
+- Typ: **Webhook**
+- URL: `https://DEINE-N8N-URL/webhook/retell-book` (SMS wird im Booking-Workflow mitgesendet)
+- *Hinweis:* Die SMS wird bereits automatisch im `book_appointment` Workflow gesendet. Dieses Tool kann als Fallback dienen, falls die SMS im Hauptworkflow nicht verschickt wurde.
 
-1. Erstelle ein neues Tool vom Typ **Transfer Call**
-2. Name: `transfer_call`
-3. Beschreibung: `Leitet den Anruf an das Praxis-Team weiter.`
-4. Zielnummer: `+493045364460`
+#### Tool 4: `transfer_call`
+- Typ: **Transfer Call**
+- Zielnummer: `+493045364446`
 
-### 3.6 Telefonnummer zuweisen
+### 6.6 Telefonnummer zuweisen
 
-1. Gehe zu **Phone Numbers** in Retell AI
-2. Kaufe eine deutsche Nummer oder verbinde eine bestehende (z.B. via Twilio)
-3. Weise die Nummer dem Agent "Jana" zu
+1. **Phone Numbers** in Retell AI
+2. Kaufe eine deutsche Nummer oder verbinde eine bestehende (z.B. via Twilio SIP)
+3. Weise die Nummer dem Agent **Jana** zu
 
 ---
 
-## 4. Testen
+## 7. Ersten Testanruf machen
 
-### Test-Szenarien
+### Checkliste vor dem Test
 
-| # | Szenario | Erwartetes Ergebnis |
+- [ ] Supabase: Tabelle `appointments` existiert
+- [ ] n8n: Workflow A (Slots) ist aktiv
+- [ ] n8n: Workflow B (Booking) ist aktiv
+- [ ] n8n: Alle Credentials sind konfiguriert
+- [ ] Retell: Agent ist konfiguriert mit System Prompt
+- [ ] Retell: Alle 4 Tools sind angelegt
+- [ ] Retell: Telefonnummer ist zugewiesen
+
+### Testszenarien durchspielen
+
+| # | Test | Erwartet |
 |---|---|---|
-| 1 | Terminwunsch mit Verordnung (Neupatient) | 5 Fragen → Lead gespeichert → Transfer |
-| 2 | Terminwunsch als Selbstzahler (Bestandspatient) | 5 Fragen → Lead gespeichert → Transfer |
-| 3 | Preisfrage Massage | Direkte Antwort: 30 € / 20 Min |
-| 4 | Frage nach Öffnungszeiten | Mo–Fr 09:00–18:00 |
-| 5 | Frage nach Adresse/ÖPNV | Sprengelstraße 47, U6/U9 Leopoldplatz |
-| 6 | Patient fragt nach Diagnose | Sofortiger Transfer |
-| 7 | Unklare Aussage | Agent fragt nach |
-| 8 | Patient will sofort Menschen | Sofortiger Transfer ohne Qualifizierung |
-| 9 | Lead in Supabase prüfen | Datensatz mit allen Feldern vorhanden |
-| 10 | Transfer landet bei richtiger Nummer | 030 453 64 46 |
+| 1 | Neupatient, Verordnung, Rücken | Termin gebucht, SMS erhalten |
+| 2 | Bestandspatient, Selbstzahler, Massage | Termin gebucht, SMS erhalten |
+| 3 | Erst Preise fragen, dann Termin | FAQ + Buchung |
+| 4 | Gewünschter Slot belegt | Alternative angeboten |
+| 5 | Andere Rückrufnummer | Korrekt übernommen |
+| 6 | Medizinische Frage | Sofort Transfer |
+| 7 | Bestimmten Therapeuten wünschen | Transfer |
+| 8 | Keine Slots in 5 Tagen | Erklärung + Transfer |
+| 9 | SMS-Bestätigung | Korrekt mit Datum/Zeit/Adresse |
+| 10 | Google Calendar | Event mit allen Daten |
 
-### Checkliste
-
-- [ ] Supabase-Tabelle `leads` existiert
-- [ ] n8n Workflow ist aktiv
-- [ ] Webhook-Test liefert `{ "success": true }`
-- [ ] Retell Agent ist konfiguriert mit System Prompt
-- [ ] Tools `save_lead` und `transfer_call` sind angelegt
-- [ ] Telefonnummer ist dem Agent zugewiesen
-- [ ] Testanruf: FAQ-Frage wird korrekt beantwortet
-- [ ] Testanruf: Lead wird vollständig gespeichert
-- [ ] Testanruf: Transfer funktioniert
-- [ ] E-Mail-Benachrichtigung kommt an (optional)
+Detaillierte Testszenarien: siehe `retell-ai/test-scenarios.json`
 
 ---
 
-## 5. Platzhalter ersetzen
+## 8. Platzhalter-Übersicht
 
-Vor der Inbetriebnahme müssen diese Platzhalter ersetzt werden:
-
-| Platzhalter | Datei | Beschreibung |
+| Platzhalter | Datei(en) | Beschreibung |
 |---|---|---|
-| `{{N8N_WEBHOOK_URL}}` | `retell-ai/agent-config.json` | n8n Webhook-URL |
-| `REPLACE_WITH_GERMAN_VOICE_ID` | `retell-ai/agent-config.json` | ElevenLabs Voice ID |
-| `REPLACE_WITH_CREDENTIAL_ID` | `n8n/workflow.json` | n8n Supabase Credential ID |
-| `REPLACE_WITH_SMTP_CREDENTIAL_ID` | `n8n/workflow.json` | n8n SMTP Credential ID |
+| `{{N8N_WEBHOOK_SLOTS_URL}}` | `agent-config.json` | n8n Webhook-URL für Slots |
+| `{{N8N_WEBHOOK_BOOK_URL}}` | `agent-config.json` | n8n Webhook-URL für Buchung |
+| `{{N8N_WEBHOOK_SMS_URL}}` | `agent-config.json` | n8n Webhook-URL für SMS |
+| `REPLACE_WITH_GERMAN_VOICE_ID` | `agent-config.json` | ElevenLabs Voice ID |
+| `{{GOOGLE_CALENDAR_ID}}` | `workflow-slots.json`, `workflow-booking.json` | Google Calendar ID |
+| `{{TWILIO_PHONE_NUMBER}}` | `workflow-booking.json` | Twilio Absender-Nummer |
+| `REPLACE_WITH_GOOGLE_CREDENTIAL_ID` | `workflow-slots.json`, `workflow-booking.json` | n8n Google Calendar Credential |
+| `REPLACE_WITH_TWILIO_CREDENTIAL_ID` | `workflow-booking.json` | n8n Twilio Credential |
+| `REPLACE_WITH_SUPABASE_CREDENTIAL_ID` | `workflow-booking.json` | n8n Supabase Credential |
+| `REPLACE_WITH_SMTP_CREDENTIAL_ID` | `workflow-booking.json` | n8n SMTP Credential |
 
 ---
 
-## 6. Produktionsbetrieb
+## 9. Monitoring & Betrieb
 
-### Monitoring
-
-- Retell AI Dashboard: Anruf-Logs, Dauer, Erfolgsrate
-- Supabase Dashboard: Neue Leads, Status-Verteilung
-- n8n Execution Log: Webhook-Aufrufe, Fehler
+- **Retell AI Dashboard:** Anruf-Logs, Dauer, Abschlussrate
+- **n8n Execution Log:** Webhook-Aufrufe, Fehler, Laufzeiten
+- **Supabase Dashboard:** Gebuchte Termine, Trend
+- **Twilio Console:** SMS-Zustellrate, Kosten
 
 ### Empfohlene Erweiterungen
 
-- **Slack-Benachrichtigung** statt/zusätzlich E-Mail
-- **Kalender-Integration** (Cal.com / Google Calendar) für echte Terminbuchung
-- **CRM-Integration** für Lead-Nachverfolgung
-- **Analytics-Dashboard** für KPIs (Anrufe/Tag, Conversion, avg. Dauer)
+- **Terminabsage/Umbuchung** per SMS-Antwort oder Anruf
+- **Warteliste** wenn keine Slots frei
+- **Analytics-Dashboard** (Anrufe/Tag, Buchungsrate, Ø Gesprächsdauer)
+- **Slack-Benachrichtigung** zusätzlich zu E-Mail

@@ -1,45 +1,54 @@
 -- ============================================================
--- Supabase Schema: Leads-Tabelle für Physiotherapie-Voice-Agent
+-- Supabase Schema: Appointments Log für Physiotherapie-Voice-Agent
 -- ============================================================
 
--- Tabelle für eingehende Leads aus dem Retell AI Voice Agent
-CREATE TABLE IF NOT EXISTS leads (
+-- Termine Log
+CREATE TABLE IF NOT EXISTS appointments (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  reason TEXT,
-  prescription TEXT CHECK (prescription IN ('Verordnung', 'Selbstzahler')),
-  new_patient BOOLEAN DEFAULT true,
-  timestamp TIMESTAMPTZ DEFAULT now(),
+  patient_name TEXT NOT NULL,
+  patient_phone TEXT NOT NULL,
+  appointment_date DATE NOT NULL,
+  appointment_time TIME NOT NULL,
+  patient_type TEXT CHECK (patient_type IN ('new_patient', 'existing_patient')),
+  prescription BOOLEAN DEFAULT false,
+  notes TEXT,
+  calendar_event_id TEXT,
+  sms_sent BOOLEAN DEFAULT false,
   source TEXT DEFAULT 'retell_ai',
-  status TEXT DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'booked', 'cancelled')),
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Index für schnelle Abfragen nach Status (z.B. alle neuen Leads)
-CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+-- Index für schnelle Abfragen nach Datum
+CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
 
--- Index für zeitbasierte Abfragen
-CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at DESC);
+-- Index für Telefonnummer-Suche
+CREATE INDEX IF NOT EXISTS idx_appointments_phone ON appointments(patient_phone);
 
 -- Row Level Security aktivieren
-ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Nur authentifizierte Nutzer dürfen lesen
-CREATE POLICY "Authenticated users can read leads"
-  ON leads FOR SELECT
+CREATE POLICY "Authenticated users can read appointments"
+  ON appointments FOR SELECT
   TO authenticated
   USING (true);
 
--- Policy: Service-Rolle (n8n Webhook) darf Leads einfügen
-CREATE POLICY "Service role can insert leads"
-  ON leads FOR INSERT
+-- Policy: Service-Rolle (n8n Webhook) darf einfügen
+CREATE POLICY "Service role can insert appointments"
+  ON appointments FOR INSERT
   TO service_role
   WITH CHECK (true);
 
--- Policy: Authentifizierte Nutzer dürfen Status aktualisieren
-CREATE POLICY "Authenticated users can update lead status"
-  ON leads FOR UPDATE
+-- Policy: Service-Rolle darf sms_sent aktualisieren
+CREATE POLICY "Service role can update appointments"
+  ON appointments FOR UPDATE
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Policy: Authentifizierte Nutzer dürfen aktualisieren
+CREATE POLICY "Authenticated users can update appointments"
+  ON appointments FOR UPDATE
   TO authenticated
   USING (true)
   WITH CHECK (true);

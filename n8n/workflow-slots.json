@@ -1,0 +1,132 @@
+{
+  "name": "Physio Sprengelkiez – Freie Slots abrufen",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retell-slots",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "webhook-slots",
+      "name": "Webhook – Get Available Slots",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "retell-slots"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Berechne die nächsten N Werktage\nconst daysAhead = $input.first().json.body.days_ahead || 5;\nconst durationMinutes = $input.first().json.body.duration_minutes || 20;\n\nconst workdays = [];\nconst now = new Date();\nlet d = new Date(now);\nd.setDate(d.getDate() + 1); // Ab morgen\n\nwhile (workdays.length < daysAhead) {\n  const day = d.getDay();\n  if (day >= 1 && day <= 5) { // Mo-Fr\n    workdays.push(new Date(d));\n  }\n  d.setDate(d.getDate() + 1);\n}\n\n// timeMin = morgen 00:00, timeMax = letzter Werktag 23:59\nconst timeMin = workdays[0].toISOString();\nconst timeMax = new Date(workdays[workdays.length - 1]);\ntimeMax.setHours(23, 59, 59);\n\nreturn [{\n  json: {\n    timeMin: timeMin,\n    timeMax: timeMax.toISOString(),\n    durationMinutes: durationMinutes,\n    workdays: workdays.map(d => d.toISOString().split('T')[0])\n  }\n}];"
+      },
+      "id": "calc-date-range",
+      "name": "Datumsbereich berechnen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendarId": "{{GOOGLE_CALENDAR_ID}}",
+        "returnAll": true,
+        "options": {
+          "timeMin": "={{ $json.timeMin }}",
+          "timeMax": "={{ $json.timeMax }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "google-calendar-events",
+      "name": "Google Calendar – Events abrufen",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [720, 300],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_WITH_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Calendar – Physio Sprengelkiez"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Daten aus vorherigen Nodes\nconst dateRange = $('Datumsbereich berechnen').first().json;\nconst durationMinutes = dateRange.durationMinutes;\nconst workdays = dateRange.workdays;\n\n// Alle bestehenden Events sammeln\nconst existingEvents = $('Google Calendar – Events abrufen').all().map(item => ({\n  start: new Date(item.json.start.dateTime || item.json.start.date),\n  end: new Date(item.json.end.dateTime || item.json.end.date)\n}));\n\n// Deutsche Wochentage\nconst dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];\nconst monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];\n\n// Freie Slots berechnen\nconst slots = [];\nconst slotDuration = durationMinutes * 60 * 1000; // ms\n\nfor (const dayStr of workdays) {\n  const day = new Date(dayStr + 'T00:00:00');\n  \n  // Slots von 09:00 bis 18:00\n  for (let hour = 9; hour < 18; hour++) {\n    for (let min = 0; min < 60; min += 20) {\n      const slotStart = new Date(day);\n      slotStart.setHours(hour, min, 0, 0);\n      const slotEnd = new Date(slotStart.getTime() + slotDuration);\n      \n      // Nicht über 18:00 hinaus\n      const endOfDay = new Date(day);\n      endOfDay.setHours(18, 0, 0, 0);\n      if (slotEnd > endOfDay) continue;\n      \n      // Prüfe ob Slot mit bestehendem Event überlappt\n      const isBlocked = existingEvents.some(ev => \n        slotStart < ev.end && slotEnd > ev.start\n      );\n      \n      if (!isBlocked) {\n        const dayName = dayNames[slotStart.getDay()];\n        const dayNum = slotStart.getDate();\n        const monthName = monthNames[slotStart.getMonth()];\n        const timeStr = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;\n        \n        slots.push({\n          date: `${dayName}, ${dayNum}. ${monthName}`,\n          time: timeStr,\n          slot_id: `${dayStr}_${timeStr.replace(':', '')}`,\n          iso_date: dayStr,\n          iso_start: slotStart.toISOString()\n        });\n      }\n    }\n  }\n}\n\n// Max 6 Slots zurückgeben (gut verteilt über die Tage)\nconst maxSlots = 6;\nlet selectedSlots = [];\n\nif (slots.length <= maxSlots) {\n  selectedSlots = slots;\n} else {\n  // Verteile gleichmäßig über die Tage\n  const byDay = {};\n  for (const s of slots) {\n    if (!byDay[s.iso_date]) byDay[s.iso_date] = [];\n    byDay[s.iso_date].push(s);\n  }\n  const days = Object.keys(byDay);\n  const perDay = Math.max(1, Math.floor(maxSlots / days.length));\n  \n  for (const day of days) {\n    const daySlots = byDay[day];\n    // Wähle Slots: morgens, mittags, nachmittags\n    const indices = [];\n    if (daySlots.length <= perDay) {\n      selectedSlots.push(...daySlots);\n    } else {\n      const step = Math.floor(daySlots.length / perDay);\n      for (let i = 0; i < perDay && i * step < daySlots.length; i++) {\n        selectedSlots.push(daySlots[i * step]);\n      }\n    }\n    if (selectedSlots.length >= maxSlots) break;\n  }\n  selectedSlots = selectedSlots.slice(0, maxSlots);\n}\n\nreturn [{\n  json: {\n    slots: selectedSlots.map(({ iso_start, iso_date, ...rest }) => rest)\n  }\n}];"
+      },
+      "id": "calc-free-slots",
+      "name": "Freie Slots berechnen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "response-slots",
+      "name": "Response – Slots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Webhook – Get Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Datumsbereich berechnen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datumsbereich berechnen": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar – Events abrufen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar – Events abrufen": {
+      "main": [
+        [
+          {
+            "node": "Freie Slots berechnen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Freie Slots berechnen": {
+      "main": [
+        [
+          {
+            "node": "Response – Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "retell-ai", "id": "tag-retell" },
+    { "name": "physio-booking", "id": "tag-booking" }
+  ]
+}

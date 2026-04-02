@@ -1,5 +1,5 @@
 {
-  "agent_name": "Jana – Physiotherapie im Sprengelkiez",
+  "agent_name": "Jana – Physio Sprengelkiez",
   "llm": {
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.4,
@@ -8,27 +8,28 @@
   "voice": {
     "provider": "elevenlabs",
     "voice_id": "REPLACE_WITH_GERMAN_VOICE_ID",
-    "voice_name": "Anna (oder vergleichbare deutsche Stimme)",
+    "voice_name": "Deutsche Stimme (z.B. Anna, Vicki)",
     "language": "de-DE",
-    "stability": 0.6,
-    "similarity_boost": 0.8
+    "stability": 0.75,
+    "similarity_boost": 0.85,
+    "style": 0.3
   },
   "conversation": {
     "language": "de-DE",
     "responsiveness": 1.0,
     "interruption_sensitivity": 0.5,
     "backchannel_enabled": true,
-    "backchannel_words": ["mhm", "ja", "verstehe", "okay"],
-    "max_call_duration_seconds": 600,
+    "backchannel_words": ["mhm", "ja", "verstehe", "natürlich"],
+    "max_call_duration_seconds": 480,
     "begin_message": null,
     "end_call_after_silence_seconds": 30
   },
   "tools": [
     {
       "type": "webhook",
-      "name": "save_lead",
-      "description": "Speichert die Lead-Daten eines Patienten, der einen Termin vereinbaren möchte. Rufe dieses Tool auf, nachdem du alle Qualifizierungsfragen gestellt und beantwortet bekommen hast: Name, Telefonnummer, Beschwerden, Verordnung/Selbstzahler, und ob Neu- oder Bestandspatient.",
-      "url": "{{N8N_WEBHOOK_URL}}",
+      "name": "get_available_slots",
+      "description": "Ruft freie Terminslots aus dem Google Calendar ab. Aufrufen nach der Einordnung (Neu-/Bestandspatient, Verordnung/Selbstzahler), bevor dem Patienten Zeitoptionen genannt werden.",
+      "url": "{{N8N_WEBHOOK_SLOTS_URL}}",
       "method": "POST",
       "headers": {
         "Content-Type": "application/json",
@@ -37,37 +38,104 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "name": {
+          "duration_minutes": {
+            "type": "integer",
+            "enum": [20, 40],
+            "description": "Dauer des Behandlungsslots in Minuten. 20 = Standard (Krankengymnastik, kurze Massage). 40 = Lymphdrainage, Massage + Fango."
+          },
+          "days_ahead": {
+            "type": "integer",
+            "description": "Anzahl Werktage in die Zukunft, für die Slots abgerufen werden. Standard: 5."
+          }
+        },
+        "required": ["duration_minutes", "days_ahead"]
+      }
+    },
+    {
+      "type": "webhook",
+      "name": "book_appointment",
+      "description": "Bucht einen Termin im Google Calendar. Aufrufen, nachdem der Patient einen Slot ausgewählt und Name + Telefonnummer bestätigt hat. NIEMALS ohne explizite Bestätigung des Patienten aufrufen.",
+      "url": "{{N8N_WEBHOOK_BOOK_URL}}",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Source": "retell-ai"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "slot_id": {
+            "type": "string",
+            "description": "Die ID des gewählten Zeitslots aus get_available_slots"
+          },
+          "patient_name": {
             "type": "string",
             "description": "Vollständiger Name des Patienten"
           },
-          "phone": {
+          "patient_phone": {
             "type": "string",
-            "description": "Rückrufnummer des Patienten"
+            "description": "Telefonnummer des Patienten im Format +49..."
           },
-          "reason": {
+          "patient_type": {
             "type": "string",
-            "description": "Beschwerden oder Anliegen des Patienten (z.B. Rückenschmerzen, Schulterbeschwerden)"
+            "enum": ["new_patient", "existing_patient"],
+            "description": "Neupatient oder Bestandspatient"
           },
           "prescription": {
-            "type": "string",
-            "enum": ["Verordnung", "Selbstzahler"],
-            "description": "Hat der Patient eine ärztliche Verordnung oder kommt als Selbstzahler?"
-          },
-          "new_patient": {
             "type": "boolean",
-            "description": "true wenn Neupatient, false wenn Bestandspatient"
+            "description": "true = ärztliche Verordnung vorhanden, false = Selbstzahler"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Anliegen/Beschwerden des Patienten, z.B. 'Rückenschmerzen, erste Behandlung'"
           }
         },
-        "required": ["name", "phone", "reason", "prescription", "new_patient"]
+        "required": ["slot_id", "patient_name", "patient_phone", "patient_type", "prescription"]
+      }
+    },
+    {
+      "type": "webhook",
+      "name": "send_sms_confirmation",
+      "description": "Sendet eine SMS-Terminbestätigung an den Patienten via Twilio. Direkt nach erfolgreichem book_appointment aufrufen.",
+      "url": "{{N8N_WEBHOOK_SMS_URL}}",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Source": "retell-ai"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Telefonnummer des Patienten im Format +49..."
+          },
+          "patient_name": {
+            "type": "string",
+            "description": "Vorname des Patienten für die SMS-Anrede"
+          },
+          "date": {
+            "type": "string",
+            "description": "Termindatum als Text, z.B. 'Montag, 7. April'"
+          },
+          "time": {
+            "type": "string",
+            "description": "Terminuhrzeit, z.B. '09:00'"
+          },
+          "address": {
+            "type": "string",
+            "description": "Praxisadresse: 'Sprengelstraße 47, 13353 Berlin'"
+          }
+        },
+        "required": ["to", "patient_name", "date", "time", "address"]
       }
     },
     {
       "type": "transfer_call",
       "name": "transfer_call",
-      "description": "Leitet den Anruf an das Praxis-Team der Physiotherapie im Sprengelkiez weiter. Nutze dieses Tool nach dem Speichern eines Leads (Terminanfrage), bei komplexen/medizinischen Fragen, oder wenn der Patient ausdrücklich mit einem Menschen sprechen möchte.",
-      "number": "+493045364460",
-      "transfer_message": "Ich verbinde Sie jetzt mit unserem Team. Einen Moment bitte."
+      "description": "Leitet den Anruf an das Praxis-Team weiter. Nutzen bei: Fragen nach konkretem Therapeuten, medizinischen Detailfragen, Patient will mit Mensch sprechen, keine Slots verfügbar, oder wenn etwas schiefgeht.",
+      "number": "+493045364446",
+      "transfer_message": "Ich verbinde Sie kurz mit unserem Team."
     }
   ]
 }
