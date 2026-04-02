@@ -1,0 +1,73 @@
+{
+  "agent_name": "Jana – Physiotherapie im Sprengelkiez",
+  "llm": {
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.4,
+    "max_tokens": 300
+  },
+  "voice": {
+    "provider": "elevenlabs",
+    "voice_id": "REPLACE_WITH_GERMAN_VOICE_ID",
+    "voice_name": "Anna (oder vergleichbare deutsche Stimme)",
+    "language": "de-DE",
+    "stability": 0.6,
+    "similarity_boost": 0.8
+  },
+  "conversation": {
+    "language": "de-DE",
+    "responsiveness": 1.0,
+    "interruption_sensitivity": 0.5,
+    "backchannel_enabled": true,
+    "backchannel_words": ["mhm", "ja", "verstehe", "okay"],
+    "max_call_duration_seconds": 600,
+    "begin_message": null,
+    "end_call_after_silence_seconds": 30
+  },
+  "tools": [
+    {
+      "type": "webhook",
+      "name": "save_lead",
+      "description": "Speichert die Lead-Daten eines Patienten, der einen Termin vereinbaren möchte. Rufe dieses Tool auf, nachdem du alle Qualifizierungsfragen gestellt und beantwortet bekommen hast: Name, Telefonnummer, Beschwerden, Verordnung/Selbstzahler, und ob Neu- oder Bestandspatient.",
+      "url": "{{N8N_WEBHOOK_URL}}",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Source": "retell-ai"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Vollständiger Name des Patienten"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Rückrufnummer des Patienten"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Beschwerden oder Anliegen des Patienten (z.B. Rückenschmerzen, Schulterbeschwerden)"
+          },
+          "prescription": {
+            "type": "string",
+            "enum": ["Verordnung", "Selbstzahler"],
+            "description": "Hat der Patient eine ärztliche Verordnung oder kommt als Selbstzahler?"
+          },
+          "new_patient": {
+            "type": "boolean",
+            "description": "true wenn Neupatient, false wenn Bestandspatient"
+          }
+        },
+        "required": ["name", "phone", "reason", "prescription", "new_patient"]
+      }
+    },
+    {
+      "type": "transfer_call",
+      "name": "transfer_call",
+      "description": "Leitet den Anruf an das Praxis-Team der Physiotherapie im Sprengelkiez weiter. Nutze dieses Tool nach dem Speichern eines Leads (Terminanfrage), bei komplexen/medizinischen Fragen, oder wenn der Patient ausdrücklich mit einem Menschen sprechen möchte.",
+      "number": "+493045364460",
+      "transfer_message": "Ich verbinde Sie jetzt mit unserem Team. Einen Moment bitte."
+    }
+  ]
+}

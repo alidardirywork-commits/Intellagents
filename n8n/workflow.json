@@ -1,0 +1,222 @@
+{
+  "name": "Retell AI → Supabase Lead Capture",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retell-lead",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook – Retell AI Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "retell-lead"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-name",
+              "leftValue": "={{ $json.body.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "condition-phone",
+              "leftValue": "={{ $json.body.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validation-if",
+      "name": "Validierung – Name & Telefon",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "name",
+              "fieldValue": "={{ $json.body.name }}"
+            },
+            {
+              "fieldName": "phone",
+              "fieldValue": "={{ $json.body.phone }}"
+            },
+            {
+              "fieldName": "reason",
+              "fieldValue": "={{ $json.body.reason || '' }}"
+            },
+            {
+              "fieldName": "prescription",
+              "fieldValue": "={{ $json.body.prescription || 'Selbstzahler' }}"
+            },
+            {
+              "fieldName": "new_patient",
+              "fieldValue": "={{ $json.body.new_patient ?? true }}"
+            },
+            {
+              "fieldName": "source",
+              "fieldValue": "retell_ai"
+            },
+            {
+              "fieldName": "status",
+              "fieldValue": "new"
+            }
+          ]
+        }
+      },
+      "id": "supabase-insert",
+      "name": "Supabase – Lead speichern",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [720, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Supabase – Physio Sprengelkiez"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "info@physio-sprengelkiez.de",
+        "subject": "=Neuer Lead: {{ $('Supabase – Lead speichern').item.json.body.name }}",
+        "message": "=Hallo Team,\n\nes gibt einen neuen Terminwunsch über den Telefonassistenten:\n\n• Name: {{ $('Webhook – Retell AI Lead').item.json.body.name }}\n• Telefon: {{ $('Webhook – Retell AI Lead').item.json.body.phone }}\n• Anliegen: {{ $('Webhook – Retell AI Lead').item.json.body.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Webhook – Retell AI Lead').item.json.body.prescription || 'Nicht angegeben' }}\n• Neupatient: {{ $('Webhook – Retell AI Lead').item.json.body.new_patient ? 'Ja' : 'Nein' }}\n• Zeitpunkt: {{ $now.toISO() }}\n\nBitte zeitnah zurückrufen.\n\nViele Grüße,\nJana (KI-Assistentin)",
+        "options": {}
+      },
+      "id": "email-notify",
+      "name": "E-Mail – Benachrichtigung",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [960, 200],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_SMTP_CREDENTIAL_ID",
+          "name": "SMTP – Praxis E-Mail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Lead gespeichert', lead_id: $('Supabase – Lead speichern').item.json.id || null }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "response-success",
+      "name": "Response – Erfolg",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1200, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'Name und Telefonnummer sind Pflichtfelder.' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "response-error",
+      "name": "Response – Validierungsfehler",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [720, 440]
+    }
+  ],
+  "connections": {
+    "Webhook – Retell AI Lead": {
+      "main": [
+        [
+          {
+            "node": "Validierung – Name & Telefon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validierung – Name & Telefon": {
+      "main": [
+        [
+          {
+            "node": "Supabase – Lead speichern",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response – Validierungsfehler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase – Lead speichern": {
+      "main": [
+        [
+          {
+            "node": "E-Mail – Benachrichtigung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-Mail – Benachrichtigung": {
+      "main": [
+        [
+          {
+            "node": "Response – Erfolg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "retell-ai",
+      "id": "tag-retell"
+    },
+    {
+      "name": "voice-agent",
+      "id": "tag-voice"
+    }
+  ]
+}

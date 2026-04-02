@@ -1,0 +1,142 @@
+{
+  "test_scenarios": [
+    {
+      "id": 1,
+      "name": "Terminwunsch mit Verordnung – Neupatient",
+      "category": "lead_qualification",
+      "caller_messages": [
+        "Hallo, ich würde gerne einen Termin machen.",
+        "Ich habe eine Verordnung vom Arzt.",
+        "Ich habe Rückenschmerzen, unterer Rücken.",
+        "Nein, das wäre mein erster Besuch bei Ihnen.",
+        "Mein Name ist Maria Schmidt.",
+        "Sie erreichen mich unter 0170 123 4567."
+      ],
+      "expected_agent_behavior": [
+        "Begrüßung mit 'Physiotherapie im Sprengelkiez, hier ist Jana'",
+        "Fragt nach Verordnung/Selbstzahler",
+        "Fragt nach Beschwerden",
+        "Fragt ob Neu-/Bestandspatient",
+        "Fragt nach vollständigem Namen",
+        "Fragt nach Telefonnummer",
+        "Ruft save_lead auf",
+        "Kündigt Transfer an",
+        "Ruft transfer_call auf"
+      ],
+      "expected_lead_data": {
+        "name": "Maria Schmidt",
+        "phone": "0170 123 4567",
+        "reason": "Rückenschmerzen, unterer Rücken",
+        "prescription": "Verordnung",
+        "new_patient": true
+      }
+    },
+    {
+      "id": 2,
+      "name": "Terminwunsch als Selbstzahler – Bestandspatient",
+      "category": "lead_qualification",
+      "caller_messages": [
+        "Ich möchte gerne eine Massage buchen.",
+        "Als Selbstzahler.",
+        "Verspannungen im Schulter-Nacken-Bereich.",
+        "Ja, ich bin schon Patient bei euch.",
+        "Thomas Müller.",
+        "030 9876 5432."
+      ],
+      "expected_agent_behavior": [
+        "Erkennt Terminwunsch",
+        "Qualifizierung durchlaufen",
+        "save_lead mit new_patient=false",
+        "Transfer"
+      ],
+      "expected_lead_data": {
+        "name": "Thomas Müller",
+        "phone": "030 9876 5432",
+        "reason": "Verspannungen im Schulter-Nacken-Bereich",
+        "prescription": "Selbstzahler",
+        "new_patient": false
+      }
+    },
+    {
+      "id": 3,
+      "name": "Preisfrage Massage",
+      "category": "faq",
+      "caller_messages": [
+        "Was kostet bei euch eine Massage?"
+      ],
+      "expected_agent_behavior": [
+        "Nennt Preise: 30€/20Min, 40€/30Min mit Heißluft, 45€/40Min mit Fango",
+        "Fragt ob noch weitere Fragen"
+      ],
+      "expected_tools_called": []
+    },
+    {
+      "id": 4,
+      "name": "Frage nach Öffnungszeiten",
+      "category": "faq",
+      "caller_messages": [
+        "Wann habt ihr geöffnet?"
+      ],
+      "expected_agent_behavior": [
+        "Nennt Öffnungszeiten: Mo-Fr 09:00-18:00",
+        "Erwähnt Rezeptionszeiten: Mo-Fr 09:00-12:00",
+        "Fragt ob noch weitere Fragen"
+      ],
+      "expected_tools_called": []
+    },
+    {
+      "id": 5,
+      "name": "Frage nach Adresse und Anfahrt",
+      "category": "faq",
+      "caller_messages": [
+        "Wo genau seid ihr? Wie komme ich am besten dahin?"
+      ],
+      "expected_agent_behavior": [
+        "Nennt Adresse: Sprengelstraße 47, 13353 Berlin",
+        "Nennt ÖPNV: U6/U9 Leopoldplatz, S41/S42 Wedding, Bus 142"
+      ],
+      "expected_tools_called": []
+    },
+    {
+      "id": 6,
+      "name": "Medizinische Frage – sofortiger Transfer",
+      "category": "transfer",
+      "caller_messages": [
+        "Ich habe einen Bandscheibenvorfall an L4/L5. Welche Therapie empfehlen Sie mir?"
+      ],
+      "expected_agent_behavior": [
+        "Stellt KEINE Diagnose",
+        "Empfiehlt KEINE spezifische Therapie",
+        "Kündigt Transfer an",
+        "Ruft transfer_call auf"
+      ],
+      "expected_tools_called": ["transfer_call"]
+    },
+    {
+      "id": 7,
+      "name": "Unklare Aussage – Nachfrage",
+      "category": "unclear",
+      "caller_messages": [
+        "Äh... ja... also ich weiß nicht genau..."
+      ],
+      "expected_agent_behavior": [
+        "Fragt freundlich nach: 'Möchten Sie einen Termin vereinbaren, oder haben Sie eine Frage?'"
+      ],
+      "expected_tools_called": []
+    },
+    {
+      "id": 8,
+      "name": "Patient will sofort Menschen sprechen",
+      "category": "transfer",
+      "caller_messages": [
+        "Kann ich bitte direkt mit jemandem aus der Praxis sprechen?"
+      ],
+      "expected_agent_behavior": [
+        "Leitet sofort weiter ohne Qualifizierung",
+        "Kündigt Transfer an",
+        "Ruft transfer_call auf"
+      ],
+      "expected_tools_called": ["transfer_call"]
+    }
+  ]
+}
