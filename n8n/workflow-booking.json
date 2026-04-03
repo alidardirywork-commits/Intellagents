@@ -165,7 +165,7 @@
     },
     {
       "parameters": {
-        "sendTo": "info@physio-sprengelkiez.de",
+        "sendTo": "info@intellagents.de",
         "subject": "=Neuer Termin: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }} am {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('dd.MM.yyyy HH:mm') }}",
         "message": "=Hallo Team,\n\nes wurde ein neuer Termin über die KI-Assistentin Jana gebucht:\n\n• Patient: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}\n• Telefon: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}\n• Termin: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} – {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_end).toFormat('HH:mm') }} Uhr\n• Anliegen: {{ $('Webhook – Buchungsanfrage').item.json.body.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Webhook – Buchungsanfrage').item.json.body.prescription || 'Nicht angegeben' }}\n• Neupatient: {{ $('Webhook – Buchungsanfrage').item.json.body.new_patient ? 'Ja' : 'Nein' }}\n• Google Calendar Event: {{ $('Google Calendar – Termin erstellen').item.json.htmlLink }}\n• SMS-Bestätigung: gesendet\n\nViele Grüße,\nJana (KI-Assistentin)",
         "options": {}
