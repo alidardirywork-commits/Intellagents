@@ -1,0 +1,303 @@
+{
+  "name": "Retell AI → Book Appointment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-appointment",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "node-webhook",
+      "name": "Webhook – Buchungsanfrage",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "book-appointment"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-name",
+              "leftValue": "={{ $json.body.patient_name }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty" }
+            },
+            {
+              "id": "cond-phone",
+              "leftValue": "={{ $json.body.patient_phone }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty" }
+            },
+            {
+              "id": "cond-slot",
+              "leftValue": "={{ $json.body.slot_start }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-validation",
+      "name": "Validierung – Pflichtfelder",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendarId": "primary",
+        "summary": "=Physio-Termin: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}",
+        "description": "=Patient: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}\nTelefon: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}\nAnliegen: {{ $('Webhook – Buchungsanfrage').item.json.body.reason || 'Nicht angegeben' }}\nVerordnung: {{ $('Webhook – Buchungsanfrage').item.json.body.prescription || 'Nicht angegeben' }}\nNeupatient: {{ $('Webhook – Buchungsanfrage').item.json.body.new_patient ? 'Ja' : 'Nein' }}\n\nGebucht über: KI-Telefonassistentin Jana",
+        "start": "={{ $('Webhook – Buchungsanfrage').item.json.body.slot_start }}",
+        "end": "={{ $('Webhook – Buchungsanfrage').item.json.body.slot_end }}",
+        "options": {
+          "location": "Physiotherapie im Sprengelkiez, Sprengelstraße 47, 13353 Berlin",
+          "sendUpdates": "all"
+        }
+      },
+      "id": "node-gcal-create",
+      "name": "Google Calendar – Termin erstellen",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [720, 200],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Calendar – Physio Sprengelkiez"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "from": "REPLACE_WITH_TWILIO_PHONE_NUMBER",
+        "to": "={{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}",
+        "message": "=Hallo {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}, Ihr Termin bei der Physiotherapie im Sprengelkiez ist bestätigt: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} Uhr. Adresse: Sprengelstraße 47, 13353 Berlin. Bei Fragen: 030 453 64 46. Wir freuen uns auf Sie!"
+      },
+      "id": "node-twilio-sms",
+      "name": "Twilio – SMS-Bestätigung",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [960, 100],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Twilio – Physio Sprengelkiez"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "appointments",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "patient_name",
+              "fieldValue": "={{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}"
+            },
+            {
+              "fieldName": "patient_phone",
+              "fieldValue": "={{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}"
+            },
+            {
+              "fieldName": "reason",
+              "fieldValue": "={{ $('Webhook – Buchungsanfrage').item.json.body.reason || '' }}"
+            },
+            {
+              "fieldName": "prescription",
+              "fieldValue": "={{ $('Webhook – Buchungsanfrage').item.json.body.prescription || 'Selbstzahler' }}"
+            },
+            {
+              "fieldName": "new_patient",
+              "fieldValue": "={{ $('Webhook – Buchungsanfrage').item.json.body.new_patient ?? true }}"
+            },
+            {
+              "fieldName": "slot_start",
+              "fieldValue": "={{ $('Webhook – Buchungsanfrage').item.json.body.slot_start }}"
+            },
+            {
+              "fieldName": "slot_end",
+              "fieldValue": "={{ $('Webhook – Buchungsanfrage').item.json.body.slot_end }}"
+            },
+            {
+              "fieldName": "google_event_id",
+              "fieldValue": "={{ $('Google Calendar – Termin erstellen').item.json.id }}"
+            },
+            {
+              "fieldName": "sms_sent",
+              "fieldValue": true
+            },
+            {
+              "fieldName": "source",
+              "fieldValue": "retell_ai"
+            },
+            {
+              "fieldName": "status",
+              "fieldValue": "confirmed"
+            }
+          ]
+        }
+      },
+      "id": "node-supabase-log",
+      "name": "Supabase – Termin speichern",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [960, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Supabase – Physio Sprengelkiez"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "info@physio-sprengelkiez.de",
+        "subject": "=Neuer Termin: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }} am {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('dd.MM.yyyy HH:mm') }}",
+        "message": "=Hallo Team,\n\nes wurde ein neuer Termin über die KI-Assistentin Jana gebucht:\n\n• Patient: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}\n• Telefon: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}\n• Termin: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} – {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_end).toFormat('HH:mm') }} Uhr\n• Anliegen: {{ $('Webhook – Buchungsanfrage').item.json.body.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Webhook – Buchungsanfrage').item.json.body.prescription || 'Nicht angegeben' }}\n• Neupatient: {{ $('Webhook – Buchungsanfrage').item.json.body.new_patient ? 'Ja' : 'Nein' }}\n• Google Calendar Event: {{ $('Google Calendar – Termin erstellen').item.json.htmlLink }}\n• SMS-Bestätigung: gesendet\n\nViele Grüße,\nJana (KI-Assistentin)",
+        "options": {}
+      },
+      "id": "node-email",
+      "name": "E-Mail – Benachrichtigung",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1200, 200],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "SMTP – Praxis E-Mail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Termin gebucht', appointment: { patient_name: $('Webhook – Buchungsanfrage').item.json.body.patient_name, slot_start: $('Webhook – Buchungsanfrage').item.json.body.slot_start, slot_end: $('Webhook – Buchungsanfrage').item.json.body.slot_end, google_event_id: $('Google Calendar – Termin erstellen').item.json.id, sms_sent: true } }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-response-success",
+      "name": "Response – Erfolg",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'patient_name, patient_phone und slot_start sind Pflichtfelder.' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "node-response-error",
+      "name": "Response – Validierungsfehler",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [720, 440]
+    }
+  ],
+  "connections": {
+    "Webhook – Buchungsanfrage": {
+      "main": [
+        [
+          {
+            "node": "Validierung – Pflichtfelder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validierung – Pflichtfelder": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar – Termin erstellen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response – Validierungsfehler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar – Termin erstellen": {
+      "main": [
+        [
+          {
+            "node": "Twilio – SMS-Bestätigung",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase – Termin speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio – SMS-Bestätigung": {
+      "main": [
+        [
+          {
+            "node": "E-Mail – Benachrichtigung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase – Termin speichern": {
+      "main": [
+        [
+          {
+            "node": "E-Mail – Benachrichtigung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-Mail – Benachrichtigung": {
+      "main": [
+        [
+          {
+            "node": "Response – Erfolg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "retell-ai", "id": "tag-retell" },
+    { "name": "voice-agent", "id": "tag-voice" },
+    { "name": "booking", "id": "tag-booking" }
+  ]
+}

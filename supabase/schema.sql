@@ -43,3 +43,47 @@ CREATE POLICY "Authenticated users can update lead status"
   TO authenticated
   USING (true)
   WITH CHECK (true);
+
+-- ============================================================
+-- Appointments-Tabelle für gebuchte Termine
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS appointments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  patient_name TEXT NOT NULL,
+  patient_phone TEXT NOT NULL,
+  reason TEXT,
+  prescription TEXT CHECK (prescription IN ('Verordnung', 'Selbstzahler')),
+  new_patient BOOLEAN DEFAULT true,
+  slot_start TIMESTAMPTZ NOT NULL,
+  slot_end TIMESTAMPTZ NOT NULL,
+  google_event_id TEXT,
+  sms_sent BOOLEAN DEFAULT false,
+  source TEXT DEFAULT 'retell_ai',
+  status TEXT DEFAULT 'confirmed' CHECK (status IN ('confirmed', 'cancelled', 'completed', 'no_show')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+CREATE INDEX IF NOT EXISTS idx_appointments_slot_start ON appointments(slot_start);
+CREATE INDEX IF NOT EXISTS idx_appointments_patient_phone ON appointments(patient_phone);
+
+-- Row Level Security
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can read appointments"
+  ON appointments FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Service role can insert appointments"
+  ON appointments FOR INSERT
+  TO service_role
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can update appointments"
+  ON appointments FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
