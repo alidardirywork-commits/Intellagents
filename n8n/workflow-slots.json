@@ -19,32 +19,52 @@
     },
     {
       "parameters": {
-        "operation": "getAll",
-        "calendarId": "primary",
-        "returnAll": false,
-        "limit": 50,
-        "options": {
-          "timeMin": "={{ $now.toISO() }}",
-          "timeMax": "={{ $now.plus({ days: 14 }).toISO() }}",
-          "singleEvents": true,
-          "orderBy": "startTime"
-        }
+        "method": "GET",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "timeMin",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "name": "timeMax",
+              "value": "={{ $now.plus({ days: 14 }).toISO() }}"
+            },
+            {
+              "name": "singleEvents",
+              "value": "true"
+            },
+            {
+              "name": "orderBy",
+              "value": "startTime"
+            },
+            {
+              "name": "maxResults",
+              "value": "250"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "node-gcal-events",
-      "name": "Google Calendar – Termine abrufen",
-      "type": "n8n-nodes-base.googleCalendar",
-      "typeVersion": 3,
+      "id": "node-gcal-fetch",
+      "name": "HTTP – Google Calendar Events abrufen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [480, 300],
       "credentials": {
-        "googleCalendarOAuth2Api": {
+        "oAuth2Api": {
           "id": "REPLACE_WITH_CREDENTIAL_ID",
-          "name": "Google Calendar – Physio Sprengelkiez"
+          "name": "Google Calendar OAuth2"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Nächste 14 Tage durchgehen und freie 20-Min-Slots finden\n// Öffnungszeiten: Mo-Fr 09:00-18:00\n\nconst existingEvents = $input.all().map(item => ({\n  start: new Date(item.json.start.dateTime || item.json.start.date),\n  end: new Date(item.json.end.dateTime || item.json.end.date)\n}));\n\nconst slots = [];\nconst now = new Date();\nconst slotDuration = 20; // Minuten\nconst maxSlots = 6;\n\nfor (let dayOffset = 0; dayOffset < 14 && slots.length < maxSlots; dayOffset++) {\n  const day = new Date(now);\n  day.setDate(day.getDate() + dayOffset);\n  \n  // Nur Mo-Fr (1-5)\n  const weekday = day.getDay();\n  if (weekday === 0 || weekday === 6) continue;\n  \n  // Slots von 09:00 bis 17:40 (letzter 20-Min-Slot endet um 18:00)\n  for (let hour = 9; hour < 18 && slots.length < maxSlots; hour++) {\n    for (let minute = 0; minute < 60 && slots.length < maxSlots; minute += slotDuration) {\n      const slotStart = new Date(day);\n      slotStart.setHours(hour, minute, 0, 0);\n      \n      const slotEnd = new Date(slotStart);\n      slotEnd.setMinutes(slotEnd.getMinutes() + slotDuration);\n      \n      // Slot muss vor 18:00 enden\n      const endLimit = new Date(day);\n      endLimit.setHours(18, 0, 0, 0);\n      if (slotEnd > endLimit) continue;\n      \n      // Slot muss in der Zukunft liegen\n      if (slotStart <= now) continue;\n      \n      // Prüfen ob Slot mit bestehendem Termin kollidiert\n      const hasConflict = existingEvents.some(event => \n        slotStart < event.end && slotEnd > event.start\n      );\n      \n      if (!hasConflict) {\n        const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];\n        slots.push({\n          start: slotStart.toISOString(),\n          end: slotEnd.toISOString(),\n          display: `${dayNames[slotStart.getDay()]}, ${slotStart.toLocaleDateString('de-DE')} um ${slotStart.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: { available_slots: slots, count: slots.length } }];"
+        "jsCode": "// Google Calendar API gibt { items: [...] } zurück\nconst calendarResponse = $input.first().json;\nconst events = calendarResponse.items || [];\n\nconst existingEvents = events.map(event => ({\n  start: new Date(event.start.dateTime || event.start.date),\n  end: new Date(event.end.dateTime || event.end.date)\n}));\n\nconst slots = [];\nconst now = new Date();\nconst slotDuration = 20; // Minuten\nconst maxSlots = 6;\n\nfor (let dayOffset = 0; dayOffset < 14 && slots.length < maxSlots; dayOffset++) {\n  const day = new Date(now);\n  day.setDate(day.getDate() + dayOffset);\n\n  // Nur Mo-Fr (1-5)\n  const weekday = day.getDay();\n  if (weekday === 0 || weekday === 6) continue;\n\n  // Slots von 09:00 bis 17:40 (letzter 20-Min-Slot endet um 18:00)\n  for (let hour = 9; hour < 18 && slots.length < maxSlots; hour++) {\n    for (let minute = 0; minute < 60 && slots.length < maxSlots; minute += slotDuration) {\n      const slotStart = new Date(day);\n      slotStart.setHours(hour, minute, 0, 0);\n\n      const slotEnd = new Date(slotStart);\n      slotEnd.setMinutes(slotEnd.getMinutes() + slotDuration);\n\n      // Slot muss vor 18:00 enden\n      const endLimit = new Date(day);\n      endLimit.setHours(18, 0, 0, 0);\n      if (slotEnd > endLimit) continue;\n\n      // Slot muss in der Zukunft liegen\n      if (slotStart <= now) continue;\n\n      // Prüfen ob Slot mit bestehendem Termin kollidiert\n      const hasConflict = existingEvents.some(event =>\n        slotStart < event.end && slotEnd > event.start\n      );\n\n      if (!hasConflict) {\n        const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];\n        slots.push({\n          start: slotStart.toISOString(),\n          end: slotEnd.toISOString(),\n          display: `${dayNames[slotStart.getDay()]}, ${slotStart.toLocaleDateString('de-DE')} um ${slotStart.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: { available_slots: slots, count: slots.length } }];"
       },
       "id": "node-find-slots",
       "name": "Code – Freie Slots berechnen",
@@ -80,14 +100,14 @@
       "main": [
         [
           {
-            "node": "Google Calendar – Termine abrufen",
+            "node": "HTTP – Google Calendar Events abrufen",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Google Calendar – Termine abrufen": {
+    "HTTP – Google Calendar Events abrufen": {
       "main": [
         [
           {
