@@ -7,7 +7,7 @@
   },
   "voice": {
     "provider": "elevenlabs",
-    "voice_id": "REPLACE_WITH_GERMAN_VOICE_ID",
+    "voice_id": "rKiu7lQ4c5P3az3745s3",
     "voice_name": "Anna (oder vergleichbare deutsche Stimme)",
     "language": "de-DE",
     "stability": 0.6,
@@ -20,7 +20,7 @@
     "backchannel_enabled": true,
     "backchannel_words": ["mhm", "ja", "verstehe", "okay"],
     "max_call_duration_seconds": 600,
-    "begin_message": null,
+    "begin_message": "Guten Tag, hier ist Jana von der Physiotherapie im Sprengelkiez. Was kann ich für Sie tun?",
     "end_call_after_silence_seconds": 30
   },
   "tools": [
@@ -28,7 +28,7 @@
       "type": "webhook",
       "name": "get_available_slots",
       "description": "Ruft die nächsten verfügbaren 20-Minuten-Terminslots aus dem Praxiskalender ab. Rufe dieses Tool auf, nachdem du die Kurzqualifizierung abgeschlossen hast (Neu-/Bestandspatient und Verordnung/Selbstzahler). Du erhältst bis zu 6 freie Slots zurück. Biete dem Patienten 3 davon an.",
-      "url": "{{N8N_WEBHOOK_URL_SLOTS}}",
+      "url": "https://intellagents.app.n8n.cloud/webhook/available-slots",
       "method": "GET",
       "headers": {
         "Content-Type": "application/json",
@@ -61,7 +61,7 @@
       "type": "webhook",
       "name": "book_appointment",
       "description": "Bucht einen Termin im Praxiskalender und speichert die Buchung in der Datenbank. Rufe dieses Tool auf, nachdem der Patient einen Slot ausgewählt hat und du Name sowie Telefonnummer erfragt hast.",
-      "url": "{{N8N_WEBHOOK_URL_BOOKING}}",
+      "url": "https://intellagents.app.n8n.cloud/webhook-test/book-appointment",
       "method": "POST",
       "headers": {
         "Content-Type": "application/json",
@@ -107,7 +107,7 @@
       "type": "webhook",
       "name": "send_sms_confirmation",
       "description": "Sendet eine SMS-Terminbestätigung an den Patienten. Rufe dieses Tool direkt nach der erfolgreichen Buchung mit book_appointment auf.",
-      "url": "{{N8N_WEBHOOK_URL_BOOKING}}",
+      "url": "https://intellagents.app.n8n.cloud/webhook-test/book-appointment",
       "method": "POST",
       "headers": {
         "Content-Type": "application/json",
@@ -140,7 +140,7 @@
       "type": "transfer_call",
       "name": "transfer_call",
       "description": "Leitet den Anruf an das Praxis-Team der Physiotherapie im Sprengelkiez weiter. Nutze dieses Tool bei komplexen/medizinischen Fragen, oder wenn der Patient ausdrücklich mit einem Menschen sprechen möchte.",
-      "number": "+493045364460",
+      "number": "+4917621647813",
       "transfer_message": "Ich verbinde Sie jetzt mit unserem Team. Einen Moment bitte."
     }
   ]
