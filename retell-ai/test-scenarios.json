@@ -2,63 +2,99 @@
   "test_scenarios": [
     {
       "id": 1,
-      "name": "Terminwunsch mit Verordnung – Neupatient",
-      "category": "lead_qualification",
+      "name": "Terminbuchung mit Verordnung – Neupatient",
+      "category": "booking",
       "caller_messages": [
         "Hallo, ich würde gerne einen Termin machen.",
+        "Das wäre mein erster Besuch.",
         "Ich habe eine Verordnung vom Arzt.",
-        "Ich habe Rückenschmerzen, unterer Rücken.",
-        "Nein, das wäre mein erster Besuch bei Ihnen.",
+        "Dienstag um 14 Uhr 20 passt gut.",
         "Mein Name ist Maria Schmidt.",
-        "Sie erreichen mich unter 0170 123 4567."
+        "0170 123 4567."
       ],
       "expected_agent_behavior": [
         "Begrüßung mit 'Physiotherapie im Sprengelkiez, hier ist Jana'",
-        "Fragt nach Verordnung/Selbstzahler",
-        "Fragt nach Beschwerden",
         "Fragt ob Neu-/Bestandspatient",
+        "Fragt nach Verordnung/Selbstzahler",
+        "Ruft get_available_slots auf",
+        "Bietet 3 Terminvorschläge an",
         "Fragt nach vollständigem Namen",
         "Fragt nach Telefonnummer",
-        "Ruft save_lead auf",
-        "Kündigt Transfer an",
-        "Ruft transfer_call auf"
+        "Ruft book_appointment auf",
+        "Bestätigt den Termin mündlich",
+        "Ruft send_sms_confirmation auf",
+        "Erwähnt SMS-Bestätigung"
       ],
-      "expected_lead_data": {
-        "name": "Maria Schmidt",
-        "phone": "0170 123 4567",
-        "reason": "Rückenschmerzen, unterer Rücken",
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"],
+      "expected_booking_data": {
+        "patient_name": "Maria Schmidt",
+        "patient_phone": "0170 123 4567",
         "prescription": "Verordnung",
         "new_patient": true
       }
     },
     {
       "id": 2,
-      "name": "Terminwunsch als Selbstzahler – Bestandspatient",
-      "category": "lead_qualification",
+      "name": "Terminbuchung als Selbstzahler – Bestandspatient",
+      "category": "booking",
       "caller_messages": [
         "Ich möchte gerne eine Massage buchen.",
-        "Als Selbstzahler.",
-        "Verspannungen im Schulter-Nacken-Bereich.",
         "Ja, ich bin schon Patient bei euch.",
+        "Als Selbstzahler.",
+        "Der Montag um 10 Uhr wäre super.",
         "Thomas Müller.",
         "030 9876 5432."
       ],
       "expected_agent_behavior": [
         "Erkennt Terminwunsch",
-        "Qualifizierung durchlaufen",
-        "save_lead mit new_patient=false",
-        "Transfer"
+        "Fragt ob Neu-/Bestandspatient",
+        "Fragt nach Verordnung/Selbstzahler",
+        "Ruft get_available_slots auf",
+        "Bietet 3 Terminvorschläge an",
+        "Patient wählt Slot",
+        "Fragt nach Name",
+        "Fragt nach Telefonnummer",
+        "Ruft book_appointment auf mit new_patient=false",
+        "Bestätigt den Termin",
+        "Ruft send_sms_confirmation auf"
       ],
-      "expected_lead_data": {
-        "name": "Thomas Müller",
-        "phone": "030 9876 5432",
-        "reason": "Verspannungen im Schulter-Nacken-Bereich",
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"],
+      "expected_booking_data": {
+        "patient_name": "Thomas Müller",
+        "patient_phone": "030 9876 5432",
         "prescription": "Selbstzahler",
         "new_patient": false
       }
     },
     {
       "id": 3,
+      "name": "Terminbuchung – keiner der 3 Slots passt",
+      "category": "booking",
+      "caller_messages": [
+        "Ich brauche einen Termin.",
+        "Erster Besuch.",
+        "Selbstzahler.",
+        "Hmm, keiner davon passt mir. Geht auch Donnerstag?",
+        "Ja, Donnerstag um 11 Uhr passt.",
+        "Lisa Weber.",
+        "0176 555 8899."
+      ],
+      "expected_agent_behavior": [
+        "Kurzqualifizierung durchlaufen",
+        "Ruft get_available_slots auf (1. Mal)",
+        "Bietet 3 Slots an",
+        "Patient lehnt alle ab",
+        "Ruft get_available_slots erneut auf (2. Mal)",
+        "Bietet weitere Slots an",
+        "Patient wählt Slot",
+        "Fragt nach Name und Telefonnummer",
+        "Ruft book_appointment auf",
+        "Ruft send_sms_confirmation auf"
+      ],
+      "expected_tools_called": ["get_available_slots", "get_available_slots", "book_appointment", "send_sms_confirmation"]
+    },
+    {
+      "id": 4,
       "name": "Preisfrage Massage",
       "category": "faq",
       "caller_messages": [
@@ -71,7 +107,7 @@
       "expected_tools_called": []
     },
     {
-      "id": 4,
+      "id": 5,
       "name": "Frage nach Öffnungszeiten",
       "category": "faq",
       "caller_messages": [
@@ -85,7 +121,7 @@
       "expected_tools_called": []
     },
     {
-      "id": 5,
+      "id": 6,
       "name": "Frage nach Adresse und Anfahrt",
       "category": "faq",
       "caller_messages": [
@@ -98,7 +134,7 @@
       "expected_tools_called": []
     },
     {
-      "id": 6,
+      "id": 7,
       "name": "Medizinische Frage – sofortiger Transfer",
       "category": "transfer",
       "caller_messages": [
@@ -113,7 +149,7 @@
       "expected_tools_called": ["transfer_call"]
     },
     {
-      "id": 7,
+      "id": 8,
       "name": "Unklare Aussage – Nachfrage",
       "category": "unclear",
       "caller_messages": [
@@ -125,7 +161,7 @@
       "expected_tools_called": []
     },
     {
-      "id": 8,
+      "id": 9,
       "name": "Patient will sofort Menschen sprechen",
       "category": "transfer",
       "caller_messages": [
@@ -137,6 +173,34 @@
         "Ruft transfer_call auf"
       ],
       "expected_tools_called": ["transfer_call"]
+    },
+    {
+      "id": 10,
+      "name": "FAQ gefolgt von Terminbuchung",
+      "category": "booking",
+      "caller_messages": [
+        "Was kostet Krankengymnastik bei euch?",
+        "Okay, dann hätte ich gerne einen Termin.",
+        "Bin schon bei euch in Behandlung.",
+        "Ich hab eine Verordnung.",
+        "Der erste Termin passt.",
+        "Sabine Meier.",
+        "0151 234 5678."
+      ],
+      "expected_agent_behavior": [
+        "Beantwortet Preisfrage: 30€/20Min oder 150€/6x",
+        "Fragt ob noch weitere Fragen",
+        "Erkennt Terminwunsch",
+        "Kurzqualifizierung durchlaufen",
+        "Ruft get_available_slots auf",
+        "Bietet 3 Slots an",
+        "Patient wählt Slot",
+        "Fragt nach Name und Telefonnummer",
+        "Ruft book_appointment auf",
+        "Bestätigt Termin",
+        "Ruft send_sms_confirmation auf"
+      ],
+      "expected_tools_called": ["get_available_slots", "book_appointment", "send_sms_confirmation"]
     }
   ]
 }

@@ -26,9 +26,42 @@
   "tools": [
     {
       "type": "webhook",
-      "name": "save_lead",
-      "description": "Speichert die Lead-Daten eines Patienten, der einen Termin vereinbaren möchte. Rufe dieses Tool auf, nachdem du alle Qualifizierungsfragen gestellt und beantwortet bekommen hast: Name, Telefonnummer, Beschwerden, Verordnung/Selbstzahler, und ob Neu- oder Bestandspatient.",
-      "url": "{{N8N_WEBHOOK_URL}}",
+      "name": "get_available_slots",
+      "description": "Ruft die nächsten verfügbaren 20-Minuten-Terminslots aus dem Praxiskalender ab. Rufe dieses Tool auf, nachdem du die Kurzqualifizierung abgeschlossen hast (Neu-/Bestandspatient und Verordnung/Selbstzahler). Du erhältst bis zu 6 freie Slots zurück. Biete dem Patienten 3 davon an.",
+      "url": "{{N8N_WEBHOOK_URL_SLOTS}}",
+      "method": "GET",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Source": "retell-ai"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "available_slots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": { "type": "string", "description": "ISO 8601 Startzeit" },
+                "end": { "type": "string", "description": "ISO 8601 Endzeit" },
+                "display": { "type": "string", "description": "Menschenlesbare Anzeige auf Deutsch" }
+              }
+            }
+          },
+          "count": { "type": "number" }
+        }
+      }
+    },
+    {
+      "type": "webhook",
+      "name": "book_appointment",
+      "description": "Bucht einen Termin im Praxiskalender und speichert die Buchung in der Datenbank. Rufe dieses Tool auf, nachdem der Patient einen Slot ausgewählt hat und du Name sowie Telefonnummer erfragt hast.",
+      "url": "{{N8N_WEBHOOK_URL_BOOKING}}",
       "method": "POST",
       "headers": {
         "Content-Type": "application/json",
@@ -37,17 +70,25 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "name": {
+          "patient_name": {
             "type": "string",
             "description": "Vollständiger Name des Patienten"
           },
-          "phone": {
+          "patient_phone": {
             "type": "string",
-            "description": "Rückrufnummer des Patienten"
+            "description": "Telefonnummer des Patienten"
+          },
+          "slot_start": {
+            "type": "string",
+            "description": "ISO 8601 Startzeit des gewählten Slots"
+          },
+          "slot_end": {
+            "type": "string",
+            "description": "ISO 8601 Endzeit des gewählten Slots"
           },
           "reason": {
             "type": "string",
-            "description": "Beschwerden oder Anliegen des Patienten (z.B. Rückenschmerzen, Schulterbeschwerden)"
+            "description": "Anliegen oder Beschwerden, falls vom Patienten genannt"
           },
           "prescription": {
             "type": "string",
@@ -59,13 +100,46 @@
             "description": "true wenn Neupatient, false wenn Bestandspatient"
           }
         },
-        "required": ["name", "phone", "reason", "prescription", "new_patient"]
+        "required": ["patient_name", "patient_phone", "slot_start", "slot_end", "prescription", "new_patient"]
+      }
+    },
+    {
+      "type": "webhook",
+      "name": "send_sms_confirmation",
+      "description": "Sendet eine SMS-Terminbestätigung an den Patienten. Rufe dieses Tool direkt nach der erfolgreichen Buchung mit book_appointment auf.",
+      "url": "{{N8N_WEBHOOK_URL_BOOKING}}",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Source": "retell-ai"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "patient_name": {
+            "type": "string",
+            "description": "Name des Patienten"
+          },
+          "patient_phone": {
+            "type": "string",
+            "description": "Telefonnummer für die SMS"
+          },
+          "slot_start": {
+            "type": "string",
+            "description": "ISO 8601 Startzeit des gebuchten Termins"
+          },
+          "slot_end": {
+            "type": "string",
+            "description": "ISO 8601 Endzeit des gebuchten Termins"
+          }
+        },
+        "required": ["patient_name", "patient_phone", "slot_start", "slot_end"]
       }
     },
     {
       "type": "transfer_call",
       "name": "transfer_call",
-      "description": "Leitet den Anruf an das Praxis-Team der Physiotherapie im Sprengelkiez weiter. Nutze dieses Tool nach dem Speichern eines Leads (Terminanfrage), bei komplexen/medizinischen Fragen, oder wenn der Patient ausdrücklich mit einem Menschen sprechen möchte.",
+      "description": "Leitet den Anruf an das Praxis-Team der Physiotherapie im Sprengelkiez weiter. Nutze dieses Tool bei komplexen/medizinischen Fragen, oder wenn der Patient ausdrücklich mit einem Menschen sprechen möchte.",
       "number": "+493045364460",
       "transfer_message": "Ich verbinde Sie jetzt mit unserem Team. Einen Moment bitte."
     }
