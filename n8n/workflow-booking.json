@@ -71,7 +71,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"summary\": \"Physio-Termin: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\",\n  \"description\": \"Patient: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\\nTelefon: {{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}\\nAnliegen: {{ $('Webhook – Buchungsanfrage').item.json.reason || 'Nicht angegeben' }}\\nVerordnung: {{ $('Webhook – Buchungsanfrage').item.json.prescription || 'Nicht angegeben' }}\\nNeupatient: {{ $('Webhook – Buchungsanfrage').item.json.new_patient ? 'Ja' : 'Nein' }}\\n\\nGebucht über: KI-Telefonassistentin Jana\",\n  \"location\": \"Physiotherapie im Sprengelkiez, Sprengelstraße 47, 13353 Berlin\",\n  \"start\": {\n    \"dateTime\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_start }}\",\n    \"timeZone\": \"Europe/Berlin\"\n  },\n  \"end\": {\n    \"dateTime\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_end }}\",\n    \"timeZone\": \"Europe/Berlin\"\n  }\n}",
+        "jsonBody": "={{ JSON.stringify({ summary: 'Physiotherapie - ' + $('Webhook – Buchungsanfrage').item.json.patient_name, start: { dateTime: $('Webhook – Buchungsanfrage').item.json.slot_start, timeZone: 'Europe/Berlin' }, end: { dateTime: $('Webhook – Buchungsanfrage').item.json.slot_end, timeZone: 'Europe/Berlin' }, description: 'Patient: ' + $('Webhook – Buchungsanfrage').item.json.patient_name + '\\nTelefon: ' + $('Webhook – Buchungsanfrage').item.json.patient_phone + '\\nVerordnung: ' + ($('Webhook – Buchungsanfrage').item.json.prescription || 'Nicht angegeben') }) }}",
         "options": {}
       },
       "id": "node-gcal-create",
