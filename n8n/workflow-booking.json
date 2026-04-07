@@ -27,19 +27,19 @@
           "conditions": [
             {
               "id": "cond-name",
-              "leftValue": "={{ $json.body.patient_name }}",
+              "leftValue": "={{ $json.patient_name }}",
               "rightValue": "",
               "operator": { "type": "string", "operation": "isNotEmpty" }
             },
             {
               "id": "cond-phone",
-              "leftValue": "={{ $json.body.patient_phone }}",
+              "leftValue": "={{ $json.patient_phone }}",
               "rightValue": "",
               "operator": { "type": "string", "operation": "isNotEmpty" }
             },
             {
               "id": "cond-slot",
-              "leftValue": "={{ $json.body.slot_start }}",
+              "leftValue": "={{ $json.slot_start }}",
               "rightValue": "",
               "operator": { "type": "string", "operation": "isNotEmpty" }
             }
@@ -71,7 +71,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"summary\": \"Physio-Termin: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}\",\n  \"description\": \"Patient: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}\\nTelefon: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}\\nAnliegen: {{ $('Webhook – Buchungsanfrage').item.json.body.reason || 'Nicht angegeben' }}\\nVerordnung: {{ $('Webhook – Buchungsanfrage').item.json.body.prescription || 'Nicht angegeben' }}\\nNeupatient: {{ $('Webhook – Buchungsanfrage').item.json.body.new_patient ? 'Ja' : 'Nein' }}\\n\\nGebucht über: KI-Telefonassistentin Jana\",\n  \"location\": \"Physiotherapie im Sprengelkiez, Sprengelstraße 47, 13353 Berlin\",\n  \"start\": {\n    \"dateTime\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.slot_start }}\",\n    \"timeZone\": \"Europe/Berlin\"\n  },\n  \"end\": {\n    \"dateTime\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.slot_end }}\",\n    \"timeZone\": \"Europe/Berlin\"\n  }\n}",
+        "jsonBody": "={\n  \"summary\": \"Physio-Termin: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\",\n  \"description\": \"Patient: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\\nTelefon: {{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}\\nAnliegen: {{ $('Webhook – Buchungsanfrage').item.json.reason || 'Nicht angegeben' }}\\nVerordnung: {{ $('Webhook – Buchungsanfrage').item.json.prescription || 'Nicht angegeben' }}\\nNeupatient: {{ $('Webhook – Buchungsanfrage').item.json.new_patient ? 'Ja' : 'Nein' }}\\n\\nGebucht über: KI-Telefonassistentin Jana\",\n  \"location\": \"Physiotherapie im Sprengelkiez, Sprengelstraße 47, 13353 Berlin\",\n  \"start\": {\n    \"dateTime\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_start }}\",\n    \"timeZone\": \"Europe/Berlin\"\n  },\n  \"end\": {\n    \"dateTime\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_end }}\",\n    \"timeZone\": \"Europe/Berlin\"\n  }\n}",
         "options": {}
       },
       "id": "node-gcal-create",
@@ -102,11 +102,11 @@
             },
             {
               "name": "To",
-              "value": "={{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}"
+              "value": "={{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}"
             },
             {
               "name": "Body",
-              "value": "=Hallo {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}, Ihr Termin bei der Physiotherapie im Sprengelkiez ist bestätigt: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} Uhr. Adresse: Sprengelstraße 47, 13353 Berlin. Bei Fragen: 030 453 64 46. Wir freuen uns auf Sie!"
+              "value": "=Hallo {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}, Ihr Termin bei der Physiotherapie im Sprengelkiez ist bestätigt: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} Uhr. Adresse: Sprengelstraße 47, 13353 Berlin. Bei Fragen: 030 453 64 46. Wir freuen uns auf Sie!"
             }
           ]
         },
@@ -151,7 +151,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"patient_name\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}\",\n  \"patient_phone\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}\",\n  \"reason\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.reason || '' }}\",\n  \"prescription\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.prescription || 'Selbstzahler' }}\",\n  \"new_patient\": {{ $('Webhook – Buchungsanfrage').item.json.body.new_patient ?? true }},\n  \"slot_start\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.slot_start }}\",\n  \"slot_end\": \"{{ $('Webhook – Buchungsanfrage').item.json.body.slot_end }}\",\n  \"google_event_id\": \"{{ $('HTTP – Google Calendar Termin erstellen').item.json.id }}\",\n  \"sms_sent\": true,\n  \"source\": \"retell_ai\",\n  \"status\": \"confirmed\"\n}",
+        "jsonBody": "={\n  \"patient_name\": \"{{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\",\n  \"patient_phone\": \"{{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}\",\n  \"reason\": \"{{ $('Webhook – Buchungsanfrage').item.json.reason || '' }}\",\n  \"prescription\": \"{{ $('Webhook – Buchungsanfrage').item.json.prescription || 'Selbstzahler' }}\",\n  \"new_patient\": {{ $('Webhook – Buchungsanfrage').item.json.new_patient ?? true }},\n  \"slot_start\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_start }}\",\n  \"slot_end\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_end }}\",\n  \"google_event_id\": \"{{ $('HTTP – Google Calendar Termin erstellen').item.json.id }}\",\n  \"sms_sent\": true,\n  \"source\": \"retell_ai\",\n  \"status\": \"confirmed\"\n}",
         "options": {}
       },
       "id": "node-supabase-log",
@@ -163,8 +163,8 @@
     {
       "parameters": {
         "sendTo": "info@intellagents.de",
-        "subject": "=Neuer Termin: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }} am {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('dd.MM.yyyy HH:mm') }}",
-        "message": "=Hallo Team,\n\nes wurde ein neuer Termin über die KI-Assistentin Jana gebucht:\n\n• Patient: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_name }}\n• Telefon: {{ $('Webhook – Buchungsanfrage').item.json.body.patient_phone }}\n• Termin: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} – {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.body.slot_end).toFormat('HH:mm') }} Uhr\n• Anliegen: {{ $('Webhook – Buchungsanfrage').item.json.body.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Webhook – Buchungsanfrage').item.json.body.prescription || 'Nicht angegeben' }}\n• Neupatient: {{ $('Webhook – Buchungsanfrage').item.json.body.new_patient ? 'Ja' : 'Nein' }}\n• Google Calendar Event: {{ $('HTTP – Google Calendar Termin erstellen').item.json.htmlLink }}\n• SMS-Bestätigung: gesendet\n\nViele Grüße,\nJana (KI-Assistentin)",
+        "subject": "=Neuer Termin: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }} am {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_start).toFormat('dd.MM.yyyy HH:mm') }}",
+        "message": "=Hallo Team,\n\nes wurde ein neuer Termin über die KI-Assistentin Jana gebucht:\n\n• Patient: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\n• Telefon: {{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}\n• Termin: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} – {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_end).toFormat('HH:mm') }} Uhr\n• Anliegen: {{ $('Webhook – Buchungsanfrage').item.json.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Webhook – Buchungsanfrage').item.json.prescription || 'Nicht angegeben' }}\n• Neupatient: {{ $('Webhook – Buchungsanfrage').item.json.new_patient ? 'Ja' : 'Nein' }}\n• Google Calendar Event: {{ $('HTTP – Google Calendar Termin erstellen').item.json.htmlLink }}\n• SMS-Bestätigung: gesendet\n\nViele Grüße,\nJana (KI-Assistentin)",
         "options": {}
       },
       "id": "node-email",
@@ -182,7 +182,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: 'Termin gebucht', appointment: { patient_name: $('Webhook – Buchungsanfrage').item.json.body.patient_name, slot_start: $('Webhook – Buchungsanfrage').item.json.body.slot_start, slot_end: $('Webhook – Buchungsanfrage').item.json.body.slot_end, google_event_id: $('HTTP – Google Calendar Termin erstellen').item.json.id, sms_sent: true } }) }}",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Termin gebucht', appointment: { patient_name: $('Webhook – Buchungsanfrage').item.json.patient_name, slot_start: $('Webhook – Buchungsanfrage').item.json.slot_start, slot_end: $('Webhook – Buchungsanfrage').item.json.slot_end, google_event_id: $('HTTP – Google Calendar Termin erstellen').item.json.id, sms_sent: true } }) }}",
         "options": {
           "responseCode": 200
         }
