@@ -19,38 +19,11 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "cond-name",
-              "leftValue": "={{ $json.patient_name }}",
-              "rightValue": "",
-              "operator": { "type": "string", "operation": "isNotEmpty" }
-            },
-            {
-              "id": "cond-phone",
-              "leftValue": "={{ $json.patient_phone }}",
-              "rightValue": "",
-              "operator": { "type": "string", "operation": "isNotEmpty" }
-            },
-            {
-              "id": "cond-slot",
-              "leftValue": "={{ $json.slot_start }}",
-              "rightValue": "",
-              "operator": { "type": "string", "operation": "isNotEmpty" }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
+        "jsCode": "// Retell AI sendet: { args: { patient_name, slot_start, patient_phone, prescription, new_patient } }\nconst args = $input.first().json.body?.args || $input.first().json.args || {};\n\nconst patientName = args.patient_name || '';\nconst patientPhone = args.patient_phone || '';\nconst slotStart = args.slot_start || '';\nconst prescription = args.prescription;\nconst newPatient = args.new_patient;\nconst reason = args.reason || '';\n\n// Validierung\nif (!patientName || !patientPhone || !slotStart) {\n  return [{ json: { valid: false, error: 'patient_name, patient_phone und slot_start sind Pflichtfelder.' } }];\n}\n\n// slot_end = slot_start + 20 Minuten\nconst startDate = new Date(slotStart);\nconst endDate = new Date(startDate.getTime() + 20 * 60 * 1000);\nconst slotEnd = endDate.toISOString();\n\n// Datum formatieren für SMS/E-Mail\nconst dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];\nconst day = dayNames[startDate.getDay()];\nconst dd = String(startDate.getDate()).padStart(2, '0');\nconst mm = String(startDate.getMonth() + 1).padStart(2, '0');\nconst yyyy = startDate.getFullYear();\nconst hh = String(startDate.getHours()).padStart(2, '0');\nconst min = String(startDate.getMinutes()).padStart(2, '0');\nconst formattedDate = `${day}, ${dd}.${mm}.${yyyy} um ${hh}:${min} Uhr`;\n\n// prescription: boolean → string\nconst prescriptionText = prescription === true ? 'Verordnung' : 'Selbstzahler';\n\nreturn [{\n  json: {\n    valid: true,\n    patient_name: patientName,\n    patient_phone: patientPhone,\n    slot_start: slotStart,\n    slot_end: slotEnd,\n    reason: reason,\n    prescription: prescriptionText,\n    new_patient: newPatient ?? true,\n    formatted_date: formattedDate\n  }\n}];"
       },
-      "id": "node-validation",
-      "name": "Validierung – Pflichtfelder",
-      "type": "n8n-nodes-base.if",
+      "id": "node-extract",
+      "name": "Code – Daten extrahieren & formatieren",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [480, 300]
     },
@@ -71,14 +44,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ summary: 'Physiotherapie - ' + $('Webhook – Buchungsanfrage').item.json.patient_name, start: { dateTime: $('Webhook – Buchungsanfrage').item.json.slot_start, timeZone: 'Europe/Berlin' }, end: { dateTime: $('Webhook – Buchungsanfrage').item.json.slot_end, timeZone: 'Europe/Berlin' }, description: 'Patient: ' + $('Webhook – Buchungsanfrage').item.json.patient_name + '\\nTelefon: ' + $('Webhook – Buchungsanfrage').item.json.patient_phone + '\\nVerordnung: ' + ($('Webhook – Buchungsanfrage').item.json.prescription || 'Nicht angegeben') }) }}",
+        "jsonBody": "={{ JSON.stringify({ summary: 'Physiotherapie - ' + $json.patient_name, start: { dateTime: $json.slot_start, timeZone: 'Europe/Berlin' }, end: { dateTime: $json.slot_end, timeZone: 'Europe/Berlin' }, description: 'Patient: ' + $json.patient_name + '\\nTelefon: ' + $json.patient_phone + '\\nVerordnung: ' + $json.prescription }) }}",
         "options": {}
       },
       "id": "node-gcal-create",
       "name": "HTTP – Google Calendar Termin erstellen",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 200],
+      "position": [720, 300],
       "credentials": {
         "oAuth2Api": {
           "id": "REPLACE_WITH_CREDENTIAL_ID",
@@ -102,11 +75,11 @@
             },
             {
               "name": "To",
-              "value": "={{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}"
+              "value": "={{ $('Code – Daten extrahieren & formatieren').item.json.patient_phone }}"
             },
             {
               "name": "Body",
-              "value": "=Hallo {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}, Ihr Termin bei der Physiotherapie im Sprengelkiez ist bestätigt: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} Uhr. Adresse: Sprengelstraße 47, 13353 Berlin. Bei Fragen: 030 453 64 46. Wir freuen uns auf Sie!"
+              "value": "=Hallo {{ $('Code – Daten extrahieren & formatieren').item.json.patient_name }}, Ihr Termin bei der Physiotherapie im Sprengelkiez ist bestätigt: {{ $('Code – Daten extrahieren & formatieren').item.json.formatted_date }}. Adresse: Sprengelstraße 47, 13353 Berlin. Bei Fragen: 030 453 64 46. Wir freuen uns auf Sie!"
             }
           ]
         },
@@ -116,7 +89,7 @@
       "name": "HTTP – Twilio SMS senden",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 100],
+      "position": [960, 200],
       "credentials": {
         "httpBasicAuth": {
           "id": "REPLACE_WITH_CREDENTIAL_ID",
@@ -151,27 +124,27 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"patient_name\": \"{{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\",\n  \"patient_phone\": \"{{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}\",\n  \"reason\": \"{{ $('Webhook – Buchungsanfrage').item.json.reason || '' }}\",\n  \"prescription\": \"{{ $('Webhook – Buchungsanfrage').item.json.prescription || 'Selbstzahler' }}\",\n  \"new_patient\": {{ $('Webhook – Buchungsanfrage').item.json.new_patient ?? true }},\n  \"slot_start\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_start }}\",\n  \"slot_end\": \"{{ $('Webhook – Buchungsanfrage').item.json.slot_end }}\",\n  \"google_event_id\": \"{{ $('HTTP – Google Calendar Termin erstellen').item.json.id }}\",\n  \"sms_sent\": true,\n  \"source\": \"retell_ai\",\n  \"status\": \"confirmed\"\n}",
+        "jsonBody": "={{ JSON.stringify({ patient_name: $('Code – Daten extrahieren & formatieren').item.json.patient_name, patient_phone: $('Code – Daten extrahieren & formatieren').item.json.patient_phone, reason: $('Code – Daten extrahieren & formatieren').item.json.reason, prescription: $('Code – Daten extrahieren & formatieren').item.json.prescription, new_patient: $('Code – Daten extrahieren & formatieren').item.json.new_patient, slot_start: $('Code – Daten extrahieren & formatieren').item.json.slot_start, slot_end: $('Code – Daten extrahieren & formatieren').item.json.slot_end, google_event_id: $('HTTP – Google Calendar Termin erstellen').item.json.id || '', sms_sent: true, source: 'retell_ai', status: 'confirmed' }) }}",
         "options": {}
       },
       "id": "node-supabase-log",
       "name": "HTTP – Supabase Termin speichern",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 300]
+      "position": [960, 400]
     },
     {
       "parameters": {
         "sendTo": "info@intellagents.de",
-        "subject": "=Neuer Termin: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }} am {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_start).toFormat('dd.MM.yyyy HH:mm') }}",
-        "message": "=Hallo Team,\n\nes wurde ein neuer Termin über die KI-Assistentin Jana gebucht:\n\n• Patient: {{ $('Webhook – Buchungsanfrage').item.json.patient_name }}\n• Telefon: {{ $('Webhook – Buchungsanfrage').item.json.patient_phone }}\n• Termin: {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_start).toFormat('cccc, dd.MM.yyyy HH:mm', { locale: 'de' }) }} – {{ DateTime.fromISO($('Webhook – Buchungsanfrage').item.json.slot_end).toFormat('HH:mm') }} Uhr\n• Anliegen: {{ $('Webhook – Buchungsanfrage').item.json.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Webhook – Buchungsanfrage').item.json.prescription || 'Nicht angegeben' }}\n• Neupatient: {{ $('Webhook – Buchungsanfrage').item.json.new_patient ? 'Ja' : 'Nein' }}\n• Google Calendar Event: {{ $('HTTP – Google Calendar Termin erstellen').item.json.htmlLink }}\n• SMS-Bestätigung: gesendet\n\nViele Grüße,\nJana (KI-Assistentin)",
+        "subject": "=Neuer Termin: {{ $('Code – Daten extrahieren & formatieren').item.json.patient_name }} – {{ $('Code – Daten extrahieren & formatieren').item.json.formatted_date }}",
+        "message": "=Hallo Team,\n\nes wurde ein neuer Termin über die KI-Assistentin Jana gebucht:\n\n• Patient: {{ $('Code – Daten extrahieren & formatieren').item.json.patient_name }}\n• Telefon: {{ $('Code – Daten extrahieren & formatieren').item.json.patient_phone }}\n• Termin: {{ $('Code – Daten extrahieren & formatieren').item.json.formatted_date }}\n• Anliegen: {{ $('Code – Daten extrahieren & formatieren').item.json.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Code – Daten extrahieren & formatieren').item.json.prescription }}\n• Neupatient: {{ $('Code – Daten extrahieren & formatieren').item.json.new_patient ? 'Ja' : 'Nein' }}\n• Google Calendar Event: {{ $('HTTP – Google Calendar Termin erstellen').item.json.htmlLink || 'N/A' }}\n• SMS-Bestätigung: gesendet\n\nViele Grüße,\nJana (KI-Assistentin)",
         "options": {}
       },
       "id": "node-email",
       "name": "E-Mail – Benachrichtigung",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1200, 200],
+      "position": [1200, 300],
       "credentials": {
         "smtp": {
           "id": "REPLACE_WITH_CREDENTIAL_ID",
@@ -182,7 +155,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: 'Termin gebucht', appointment: { patient_name: $('Webhook – Buchungsanfrage').item.json.patient_name, slot_start: $('Webhook – Buchungsanfrage').item.json.slot_start, slot_end: $('Webhook – Buchungsanfrage').item.json.slot_end, google_event_id: $('HTTP – Google Calendar Termin erstellen').item.json.id, sms_sent: true } }) }}",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Termin gebucht', appointment: { patient_name: $('Code – Daten extrahieren & formatieren').item.json.patient_name, slot_start: $('Code – Daten extrahieren & formatieren').item.json.slot_start, slot_end: $('Code – Daten extrahieren & formatieren').item.json.slot_end, formatted_date: $('Code – Daten extrahieren & formatieren').item.json.formatted_date, google_event_id: $('HTTP – Google Calendar Termin erstellen').item.json.id || null, sms_sent: true } }) }}",
         "options": {
           "responseCode": 200
         }
@@ -191,21 +164,7 @@
       "name": "Response – Erfolg",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1440, 200]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: false, error: 'patient_name, patient_phone und slot_start sind Pflichtfelder.' }) }}",
-        "options": {
-          "responseCode": 400
-        }
-      },
-      "id": "node-response-error",
-      "name": "Response – Validierungsfehler",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [720, 440]
+      "position": [1440, 300]
     }
   ],
   "connections": {
@@ -213,25 +172,18 @@
       "main": [
         [
           {
-            "node": "Validierung – Pflichtfelder",
+            "node": "Code – Daten extrahieren & formatieren",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validierung – Pflichtfelder": {
+    "Code – Daten extrahieren & formatieren": {
       "main": [
         [
           {
             "node": "HTTP – Google Calendar Termin erstellen",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Response – Validierungsfehler",
             "type": "main",
             "index": 0
           }
