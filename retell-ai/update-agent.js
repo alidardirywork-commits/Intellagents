@@ -87,8 +87,8 @@ async function updateAgent() {
               name: "reason",
               type: "string",
               description:
-                "Anliegen oder Beschwerden, falls vom Patienten genannt",
-              required: false,
+                "Die gebuchte Leistung, z.B. Massage mit Heißluft 30 Min – 40 €",
+              required: true,
             },
             {
               name: "prescription",

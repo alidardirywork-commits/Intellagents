@@ -88,7 +88,7 @@
           },
           "reason": {
             "type": "string",
-            "description": "Anliegen oder Beschwerden, falls vom Patienten genannt"
+            "description": "Die gebuchte Leistung, z.B. Massage mit Heißluft 30 Min – 40 €"
           },
           "prescription": {
             "type": "string",
@@ -100,7 +100,7 @@
             "description": "true wenn Neupatient, false wenn Bestandspatient"
           }
         },
-        "required": ["patient_name", "patient_phone", "slot_start", "slot_end", "prescription", "new_patient"]
+        "required": ["patient_name", "patient_phone", "slot_start", "slot_end", "reason", "prescription", "new_patient"]
       }
     },
     {

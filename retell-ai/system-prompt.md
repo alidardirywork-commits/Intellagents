@@ -114,7 +114,8 @@ Nach der Kurzqualifizierung:
 
 Nachdem der Patient einen Slot gewählt hat und Name + Telefonnummer vorliegen:
 
-1. Rufe das Tool `book_appointment` auf mit allen gesammelten Daten. Fülle das Feld `reason` immer mit der konkreten gebuchten Leistung aus. Beispiele:
+1. Rufe das Tool `book_appointment` auf mit allen gesammelten Daten. **WICHTIG: Fülle das Feld `reason` IMMER aus** – es darf niemals leer sein. Trage die konkrete gebuchte Leistung mit Dauer und Preis ein.
+   - Beispiel: Patient bucht „Massage mit Heißluft 30 Min" → `reason = "Massage mit Heißluft 30 Min – 40 €"`
    - Selbstzahler: `"Klassische Massage 20 Min – 30 €"`, `"Lymphdrainage 40 Min – 45 €"`, `"Fußreflexzonentherapie 45 Min – 50 €"`
    - Verordnung: `"Krankengymnastik mit Verordnung"`, `"Erstbehandlung – Rückenschmerzen"`
 2. Bestätige den Termin: „Wunderbar, Ihr Termin ist gebucht: [Tag], [Uhrzeit] Uhr bei uns in der Sprengelstraße 47."
