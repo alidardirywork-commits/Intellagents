@@ -44,7 +44,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ summary: 'Physiotherapie - ' + $json.patient_name, start: { dateTime: $json.slot_start, timeZone: 'Europe/Berlin' }, end: { dateTime: $json.slot_end, timeZone: 'Europe/Berlin' }, description: 'Patient: ' + $json.patient_name + '\\nTelefon: ' + $json.patient_phone + '\\nVerordnung: ' + $json.prescription }) }}",
+        "jsonBody": "={{ JSON.stringify({ summary: 'Physiotherapie - ' + $json.patient_name, start: { dateTime: $json.slot_start, timeZone: 'Europe/Berlin' }, end: { dateTime: $json.slot_end, timeZone: 'Europe/Berlin' }, description: 'Patient: ' + $json.patient_name + '\\nTelefon: ' + $json.patient_phone + '\\nLeistung: ' + ($json.reason || 'Nicht angegeben') + '\\nVerordnung: ' + $json.prescription }) }}",
         "options": {}
       },
       "id": "node-gcal-create",
@@ -137,7 +137,7 @@
       "parameters": {
         "sendTo": "info@intellagents.de",
         "subject": "=Neuer Termin: {{ $('Code – Daten extrahieren & formatieren').item.json.patient_name }} – {{ $('Code – Daten extrahieren & formatieren').item.json.formatted_date }}",
-        "message": "=Hallo Team,\n\nes wurde ein neuer Termin über die KI-Assistentin Jana gebucht:\n\n• Patient: {{ $('Code – Daten extrahieren & formatieren').item.json.patient_name }}\n• Telefon: {{ $('Code – Daten extrahieren & formatieren').item.json.patient_phone }}\n• Termin: {{ $('Code – Daten extrahieren & formatieren').item.json.formatted_date }}\n• Anliegen: {{ $('Code – Daten extrahieren & formatieren').item.json.reason || 'Nicht angegeben' }}\n• Verordnung/Selbstzahler: {{ $('Code – Daten extrahieren & formatieren').item.json.prescription }}\n• Neupatient: {{ $('Code – Daten extrahieren & formatieren').item.json.new_patient ? 'Ja' : 'Nein' }}\n• Google Calendar Event: {{ $('HTTP – Google Calendar Termin erstellen').item.json.htmlLink || 'N/A' }}\n• SMS-Bestätigung: gesendet\n\nViele Grüße,\nJana (KI-Assistentin)",
+        "message": "=<h2>Neuer Termin über KI-Assistentin Jana</h2><p><b>Patient:</b> {{ $('Code – Daten extrahieren & formatieren').item.json.patient_name }}</p><p><b>Telefon:</b> {{ $('Code – Daten extrahieren & formatieren').item.json.patient_phone }}</p><p><b>Termin:</b> {{ $('Code – Daten extrahieren & formatieren').item.json.formatted_date }}</p><p><b>Gebuchte Leistung:</b> {{ $('Code – Daten extrahieren & formatieren').item.json.reason || 'Nicht angegeben' }}</p><p><b>Verordnung/Selbstzahler:</b> {{ $('Code – Daten extrahieren & formatieren').item.json.prescription }}</p><p><b>Neupatient:</b> {{ $('Code – Daten extrahieren & formatieren').item.json.new_patient ? 'Ja' : 'Nein' }}</p><p><b>Google Calendar:</b> {{ $('HTTP – Google Calendar Termin erstellen').item.json.htmlLink || 'N/A' }}</p><p><b>SMS-Bestätigung:</b> gesendet</p><br><p>Viele Grüße,<br>Jana (KI-Assistentin)</p>",
         "options": {}
       },
       "id": "node-email",
@@ -218,15 +218,7 @@
       ]
     },
     "HTTP – Supabase Termin speichern": {
-      "main": [
-        [
-          {
-            "node": "E-Mail – Benachrichtigung",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[]]
     },
     "E-Mail – Benachrichtigung": {
       "main": [
