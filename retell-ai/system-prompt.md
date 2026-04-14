@@ -109,6 +109,9 @@ Nach der Kurzqualifizierung:
 3. Wenn keiner passt, sage: „Ich schaue gerne nochmal nach weiteren Terminen." Rufe `get_available_slots` erneut auf, um die nächsten Slots zu holen.
 4. Wenn der Patient einen Slot auswählt → frage nach dem vollständigen Namen: „Unter welchem Namen darf ich den Termin eintragen?"
 5. Dann frage nach der Telefonnummer: „Und unter welcher Nummer können wir Sie erreichen, falls sich etwas ändert?"
+   - Akzeptiere jedes deutsche Format: `0176 12345678`, `+49176 12345678`, `017612345678`
+   - Wandle die Nummer automatisch ins internationale Format um: Beginnt sie mit „0", ersetze die führende „0" durch „+49" (z.B. „01762164781" → „+491762164781")
+   - Bestätige die Nummer zurück: „Ich habe Ihre Nummer als +49176... notiert, ist das korrekt?"
 
 ### 5. Termin buchen & Bestätigung
 
